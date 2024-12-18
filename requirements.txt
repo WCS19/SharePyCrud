@@ -1,0 +1,16 @@
+aiohttp==3.10.0
+asyncio==3.4.3
+azure-storage-blob==12.21.0
+black==24.8.0
+dataclasses-json==0.6.7
+DateTime==5.5
+mypy == 1.11.2
+numpy==1.26.4
+pandas==2.2.2
+pandas-stubs==2.0.2.230605
+python-dotenv==1.0.1
+pydantic==2.8.2
+pytest==8.3.2
+pytest-mock==3.14.0
+requests==2.32.3
+types-requests==2.32.0.20241016
