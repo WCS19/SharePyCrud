@@ -1,7 +1,9 @@
 from typing import Dict, List, Optional, Tuple, Any
 import os
-from src.utils import make_graph_request, format_graph_url
-from src.config import SharePointConfig
+from .utils import make_graph_request, format_graph_url
+from .config import SharePointConfig
+from requests import Response
+import requests
 
 
 class SharePointClient:
@@ -26,6 +28,26 @@ class SharePointClient:
         response = make_graph_request(url, "", method="POST", data=body)
         return response.get("access_token") if response else None
 
+    def list_sites(self) -> Optional[List[Optional[str]]]:
+        """List all sites
+
+        Returns:
+            Optional[List[Optional[str]]]: List of site names, or None if request fails.
+            Individual site names can be None if they don't have a name.
+        """
+        if not self.access_token:
+            return None
+        url = format_graph_url("sites")
+        response = make_graph_request(url, self.access_token)
+
+        # Extract site names, allowing for None values
+        site_names = (
+            [site.get("name") for site in response.get("value", [])]
+            if response
+            else None
+        )
+        return site_names
+
     def get_site_id(
         self, sharepoint_url: Optional[str] = None, site_name: Optional[str] = None
     ) -> Optional[str]:
@@ -33,7 +55,7 @@ class SharePointClient:
         if not self.access_token:
             return None
         base_url = sharepoint_url or self.config.sharepoint_url
-        site = site_name or self.config.site_name
+        site = site_name
 
         url = format_graph_url(f"sites/{base_url}:/sites/{site}")
         response = make_graph_request(url, self.access_token)
@@ -48,7 +70,7 @@ class SharePointClient:
         response = make_graph_request(url, self.access_token)
 
         if response and "value" in response:
-            print("Drives:")
+            print("=== Drives ===:")
             for drive in response["value"]:
                 print(f"\nDrive: {drive['name']}, ID: {drive['id']}")
 
@@ -154,3 +176,75 @@ class SharePointClient:
 
         print(f"Found {len(folder_contents)} items in folder")  # Debug print
         return folder_contents
+
+    def download_file(
+        self,
+        file_path: str,
+        site_name: Optional[str] = None,
+        drive_name: Optional[str] = None,
+    ) -> Optional[bytes]:
+        """Download a file from SharePoint
+
+        Args:
+            file_path: Path to the file in SharePoint
+            site_name: Optional name of the SharePoint site
+            drive_name: Optional name of the drive containing the file
+
+        Returns:
+            File content as bytes if successful, None otherwise
+        """
+        if not self.access_token:
+            print("No access token available")
+            return None
+
+        # Get site ID
+        site_id = self.get_site_id(site_name=site_name)
+        if not site_id:
+            print("Failed to get site ID")
+            return None
+
+        # Get drive ID
+        drive_id = (
+            self.get_drive_id_by_name(site_id, drive_name) if drive_name else None
+        )
+        if not drive_id:
+            print(f"Drive '{drive_name}' not found")
+            return None
+
+        # Download file - using items endpoint instead of root
+        url = format_graph_url("drives", drive_id, "root/children")
+
+        # First, get the file ID
+        list_response = make_graph_request(url, self.access_token)
+        if not list_response or "value" not in list_response:
+            print("Failed to list drive contents")
+            return None
+
+        file_id = None
+        for item in list_response["value"]:
+            if item.get("name") == file_path:
+                file_id = item.get("id")
+                break
+
+        if not file_id:
+            print(f"File '{file_path}' not found in drive")
+            return None
+
+        # Now download the file using its ID
+        download_url = format_graph_url("drives", drive_id, "items", file_id, "content")
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+        }
+
+        try:
+            download_response: Response = requests.get(download_url, headers=headers)
+            if download_response.status_code == 200:
+                print(f"✓ Successfully downloaded: {file_path}")
+                return download_response.content
+            print(
+                f"Error downloading file. Status code: {download_response.status_code}"
+            )
+            return None
+        except Exception as e:
+            print(f"Error downloading file: {str(e)}")
+            return None
