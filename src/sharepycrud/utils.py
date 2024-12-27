@@ -43,7 +43,8 @@ def make_graph_request(
 
     response_json = cast(Dict[str, Any], response.json())
 
-    if response.status_code != 200:
+    # 200 is OK, 201 is created
+    if response.status_code not in [200, 201]:
         print(f"Error making request to {url}. Status code: {response.status_code}")
         print("Response:", response_json)
         return {}
