@@ -1,5 +1,6 @@
 from sharepycrud.client import SharePointClient
 from sharepycrud.utils import setup_client
+import os
 
 
 def main() -> None:
@@ -16,7 +17,8 @@ def main() -> None:
     )
 
     if file_content:
-        with open("Willem Seethaler Resume 2024.docx", "wb") as f:
+        save_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Willem Seethaler Resume 2024.docx")
+        with open(save_path, "wb") as f:
             f.write(file_content)
 
 
