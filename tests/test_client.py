@@ -76,36 +76,110 @@ def test_get_site_id_failure(client: SharePointClient, mocker: Mock) -> None:
     assert site_id is None
 
 
-def test_get_drive_id_by_name_success(client: SharePointClient, mocker: Mock) -> None:
-    """Test successful drive ID retrieval by name"""
+def test_list_drives_success(client: SharePointClient, mocker: Mock) -> None:
+    """Test successful drive listing"""
     mock_response = {
         "value": [
-            {"id": "drive1-id", "name": "Drive1"},
-            {"id": "drive2-id", "name": "Drive2"},
+            {"name": "drive1", "id": "drive1-id"},
+            {"name": "drive2", "id": "drive2-id"},
         ]
     }
     mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
 
-    drive_id = client.get_drive_id_by_name("test-site-id", "Drive1")
-    assert drive_id == "drive1-id"
+    drives = client.list_drives("test-site-id")
+    assert drives == mock_response
 
 
-def test_get_drive_id_by_name_not_found(
-    client: SharePointClient, mocker: MockerFixture
-) -> None:
-    """Test drive ID retrieval when drive not found"""
-    mock_response: Dict[str, List[Any]] = {"value": []}
+def test_list_drives_failure(client: SharePointClient, mocker: Mock) -> None:
+    """Test drive listing failure"""
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=None)
+
+    drives = client.list_drives("test-site-id")
+    assert drives is None
+
+
+def test_get_drive_id_success(client: SharePointClient, mocker: Mock) -> None:
+    """Test successful drive ID retrieval"""
+    mock_response = {
+        "value": [
+            {"name": "test-drive", "id": "test-drive-id"},
+            {"name": "other-drive", "id": "other-id"},
+        ]
+    }
     mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
 
-    drive_id = client.get_drive_id_by_name("test-site-id", "NonexistentDrive")
+    drive_id = client.get_drive_id("test-site-id", "test-drive")
+    assert drive_id == "test-drive-id"
+
+
+def test_get_drive_id_not_found(client: SharePointClient, mocker: Mock) -> None:
+    """Test drive ID retrieval when drive name doesn't exist"""
+    mock_response = {"value": [{"name": "other-drive", "id": "other-id"}]}
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    drive_id = client.get_drive_id("test-site-id", "test-drive")
     assert drive_id is None
+
+
+def test_list_all_folders_success(client: SharePointClient, mocker: Mock) -> None:
+    """Test successful folder listing"""
+    # Mock for initial call
+    root_response = {
+        "value": [
+            {
+                "name": "folder1",
+                "id": "folder1-id",
+                "folder": {},
+                "parentReference": {"path": "/drives/test-drive-id/root"},
+            },
+            {
+                "name": "folder2",
+                "id": "folder2-id",
+                "folder": {},
+                "parentReference": {"path": "/drives/test-drive-id/root"},
+            },
+        ]
+    }
+
+    # Mock for subfolder calls - return empty to prevent recursion
+    empty_response: Dict[str, List[Any]] = {"value": []}
+
+    def mock_request(url: str, *args: Any, **kwargs: Any) -> Dict[str, List[Any]]:
+        if "folder1-id" in url or "folder2-id" in url:
+            return empty_response
+        return root_response
+
+    mocker.patch("sharepycrud.client.make_graph_request", side_effect=mock_request)
+
+    folders = client.list_all_folders("test-drive-id")
+    expected_folders = [
+        {
+            "name": "folder1",
+            "id": "folder1-id",
+            "path": "/drives/test-drive-id/root/folder1",
+        },
+        {
+            "name": "folder2",
+            "id": "folder2-id",
+            "path": "/drives/test-drive-id/root/folder2",
+        },
+    ]
+    assert folders == expected_folders
+
+
+def test_list_all_folders_failure(client: SharePointClient, mocker: Mock) -> None:
+    """Test folder listing failure"""
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=None)
+
+    folders = client.list_all_folders("test-drive-id")
+    assert folders == []
 
 
 def test_download_file_success(client: SharePointClient, mocker: Mock) -> None:
     """Test successful file download"""
     # Mock site and drive ID lookups
     mocker.patch.object(client, "get_site_id", return_value="test-site-id")
-    mocker.patch.object(client, "get_drive_id_by_name", return_value="test-drive-id")
+    mocker.patch.object(client, "get_drive_id", return_value="test-drive-id")
 
     # Mock file listing
     mock_list_response = {"value": [{"id": "test-file-id", "name": "test.txt"}]}
@@ -126,7 +200,7 @@ def test_download_file_success(client: SharePointClient, mocker: Mock) -> None:
 def test_download_file_not_found(client: SharePointClient, mocker: Mock) -> None:
     """Test file download when file not found"""
     mocker.patch.object(client, "get_site_id", return_value="test-site-id")
-    mocker.patch.object(client, "get_drive_id_by_name", return_value="test-drive-id")
+    mocker.patch.object(client, "get_drive_id", return_value="test-drive-id")
     mocker.patch("sharepycrud.client.make_graph_request", return_value={"value": []})
 
     content = client.download_file("nonexistent.txt", "test-site", "test-drive")
