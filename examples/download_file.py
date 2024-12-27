@@ -17,7 +17,10 @@ def main() -> None:
     )
 
     if file_content:
-        save_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Willem Seethaler Resume 2024.docx")
+        save_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "Willem Seethaler Resume 2024.docx",
+        )
         with open(save_path, "wb") as f:
             f.write(file_content)
 
