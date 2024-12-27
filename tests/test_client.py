@@ -205,3 +205,23 @@ def test_download_file_not_found(client: SharePointClient, mocker: Mock) -> None
 
     content = client.download_file("nonexistent.txt", "test-site", "test-drive")
     assert content is None
+
+
+def test_create_folder_success(client: SharePointClient, mocker: Mock) -> None:
+    """Test successful folder creation"""
+    mocker.patch.object(client, "get_site_id", return_value="test-site-id")
+    mocker.patch.object(client, "get_drive_id", return_value="test-drive-id")
+    mocker.patch(
+        "sharepycrud.client.make_graph_request", return_value={"id": "new-folder-id"}
+    )
+
+    folder = client.create_folder("test-drive-id", "root", "new-folder", "test-site-id")
+    assert folder == {"id": "new-folder-id"}
+
+
+def test_create_folder_failure(client: SharePointClient, mocker: Mock) -> None:
+    """Test folder creation failure"""
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=None)
+
+    folder = client.create_folder("test-drive-id", "root", "new-folder", "test-site-id")
+    assert folder is None
