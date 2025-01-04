@@ -13,9 +13,11 @@ This package is a Python library for SharePoint CRUD operations. The package is 
 2. [Setup Instructions](#setup-instructions)
 3. [Contributing](#contributing)
 4. [Documentation References](#documentation-references)
-5. [Examples](#examples)
+5. [Examples](<https://github.com/WCS19/SharePyCrud/tree/main/examples> "Examples Directory")
 6. [Changelog](#changelog)
-7. [License](#license)
+7. [Github Repository](https://github.com/WCS19/SharePyCrud)
+8. [License](#license)
+
 
 ---
 
@@ -79,7 +81,15 @@ See the [CHANGELOG.md](docs/CHANGELOG.md) file for the latest updates and planne
 
 ---
 
-###License
+### Github Repository
+
+Please visit the Github repository for all the latest documentation.
+
+[SharePyCrud Github Repository](https://github.com/WCS19/SharePyCrud)
+
+---
+
+### License
 This project is licensed under the [MIT License](LICENSE). You are free to use, modify, and distribute the code, provided proper attribution is given.
 
 Thank you for using SharePyCrud! If you have any questions or suggestions, feel free to open an issue or contribute to the project.

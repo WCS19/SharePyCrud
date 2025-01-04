@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added CHANGELOG.md file
 - Adjusting the README.md file
 
+## [0.1.2] - 2025-01-04
+### Added
+- Added setup_client function to initialize the SharePointClient with configuration.
+
+
 
 ## Roadmap
 
