@@ -14,7 +14,8 @@ This package is a Python library for SharePoint CRUD operations. The package is 
 3. [Contributing](#contributing)
 4. [Documentation References](#documentation-references)
 5. [Examples](#examples)
-6. [License](#license)
+6. [Changelog](#changelog)
+7. [License](#license)
 
 ---
 
@@ -70,6 +71,13 @@ python examples/download_file.py
 ```
 
 There are currently only examples for the read operations. Examples for the other operations will be added in future releases.
+
+---
+
+### Changelog
+See the [CHANGELOG.md](docs/CHANGELOG.md) file for the latest updates and planned features.
+
+---
 
 ###License
 This project is licensed under the [MIT License](LICENSE). You are free to use, modify, and distribute the code, provided proper attribution is given.
