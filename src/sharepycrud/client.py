@@ -247,26 +247,3 @@ class SharePointClient:
             return download_response.content
         print(f"Error downloading file. Status code: {download_response.status_code}")
         return None
-
-    ##################################################################################
-    # Create Logic
-    ##################################################################################
-    def create_folder(
-        self, drive_id: str, parent_folder_id: str, folder_name: str, site_id: str
-    ) -> Optional[Dict[str, Any]]:
-        """Create a new folder in SharePoint"""
-        if not self.access_token:
-            return None
-
-        # Use drives/{drive_id} directly without site context
-        url = format_graph_url(
-            "drives", drive_id, "items", parent_folder_id, "children"
-        )
-        data = {
-            "name": folder_name,
-            "folder": {},  # Folder indicator
-            "@microsoft.graph.conflictBehavior": "rename",
-        }
-
-        response = make_graph_request(url, self.access_token, method="POST", data=data)
-        return response if response else None
