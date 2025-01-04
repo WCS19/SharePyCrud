@@ -20,6 +20,7 @@ setup(
             "pydantic==2.8.2",
             "types-requests==2.31.0",
             "types-setuptools==75.6.0.20241223",
+            "pre-commit==4.0.1",
         ],
         "test": [
             "pytest==8.3.2",
