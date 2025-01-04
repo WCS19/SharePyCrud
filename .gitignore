@@ -166,3 +166,6 @@ playground.py
 
 # Ignore notes text file
 notes.txt
+
+# Ignore pypirc file
+.pypirc
