@@ -10,7 +10,7 @@ Before proceeding, ensure you have the following installed:
 
 - Python 3.11 or higher
 - Git
-- A virtual environment tool (e.g., `venv` or `virtualenv`)
+- A virtual environment tool (e.g., `venv`)
 
 ---
 
@@ -82,5 +82,3 @@ Now that you have set up SharePyCrud, you can start using it to interact with yo
 2. Refer to the [Documentation References](README.md#documentation-references) for additional context and guidance.
 
 3. Contribute to the project! Check out the [CONTRIBUTING.md](CONTRIBUTING.md) file to learn how you can help improve SharePyCrud.
-
-

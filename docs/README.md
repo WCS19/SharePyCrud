@@ -23,9 +23,9 @@ This package is a Python library for SharePoint CRUD operations. The package is 
 SharePyCrud simplifies interaction with SharePoint for CRUD (Create, Read, Update, Delete) operations by providing an intuitive Python API. It's designed to handle common SharePoint tasks, such as:
 
 - Accessing files and folders in SharePoint document libraries.
-- Downloading, uploading, and deleting files.
-- Managing Sharepoint lists and items (planned).
-- Seamlessly integrating with SharePoint Online using modern authentication methods.
+- Downloading files in SharePoint sites.
+- Creating folders and subfolders (planned).
+- Updating and deleting files (planned).
 
 ---
 
@@ -72,6 +72,6 @@ python examples/download_file.py
 There are currently only examples for the read operations. Examples for the other operations will be added in future releases.
 
 ###License
-This project is licensed under the MIT License. You are free to use, modify, and distribute the code, provided proper attribution is given.
+This project is licensed under the [MIT License](LICENSE). You are free to use, modify, and distribute the code, provided proper attribution is given.
 
 Thank you for using SharePyCrud! If you have any questions or suggestions, feel free to open an issue or contribute to the project.
