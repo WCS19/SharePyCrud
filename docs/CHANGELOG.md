@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - python-dotenv==1.0.1
   - dataclasses-json==0.6.7
 
+## [0.1.1] - 2025-01-04
+
+### Added
+- Added CHANGELOG.md file
+- Adjusting the README.md file
+
 
 ## Roadmap
 
