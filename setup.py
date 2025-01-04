@@ -12,7 +12,6 @@ setup(
         "dataclasses-json==0.6.7",
         "requests==2.32.3",
         "python-dotenv==1.0.1",
-
     ],
     extras_require={
         "dev": [
