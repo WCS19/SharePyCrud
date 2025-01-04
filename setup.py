@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="sharepycrud",
-    version="0.1.0",
+    version="0.1.0.dev0",
     author="Willem Seethaler",
     author_email="wcs@bu.edu",
     description="Python library for CRUD operations on SharePoint",
