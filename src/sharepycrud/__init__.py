@@ -7,7 +7,7 @@
 
 """SharePyCrud: A Python library for SharePoint CRUD operations."""
 
-__version__ = "0.1.3"
+__version__ = "0.1.0"
 
 from .auth import SharePointAuth
 from .config import SharePointConfig
