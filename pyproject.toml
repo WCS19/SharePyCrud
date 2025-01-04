@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sharepycrud"
 version = "0.1.0"
 description = "Python library for CRUD operations on SharePoint"
+readme = "README.md"
 authors = [
     {name = "Willem Seethaler", email = "wcs@bu.edu"}
 ]
