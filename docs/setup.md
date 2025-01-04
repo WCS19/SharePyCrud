@@ -14,7 +14,15 @@ Before proceeding, ensure you have the following installed:
 
 ---
 
-## Step-by-Step Setup
+## Installation
+
+### For Users
+
+```bash
+pip install sharepycrud
+```
+
+### For Developers
 
 ### 1. Clone the Repository
 
@@ -35,21 +43,13 @@ source .venv/bin/activate
 ```
 
 ### 3. Install the SharePyCrud Package
-Install the package in development mode:
+Install the package in development mode with all dependencies:
 
 ```bash
-pip install -e .
+pip install -e ".[dev,test,all]"
 ```
 
-### 4. (Optional) Install Development Dependencies
-
-If you are contributing to the project or require additional tools, install the development dependencies:
-
-```bash
-pip install -r dev-requirements.txt
-```
-
-### 5. Configure Environment Variables
+### 4. Configure Environment Variables
 
 The project requires specific environment variables for authentication with SharePoint. Use the provided .env.example file as a template:
 
