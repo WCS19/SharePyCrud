@@ -61,7 +61,7 @@ jobs:
     - name: Generate coverage report
       run: |
         mkdir -p coverage-results
-        python -m pytest --cov=src --cov-report=html tests/
+        python -m pytest --cov=src --cov-report=html --cov-report=xml tests/
         mv htmlcov/* coverage-results/
 
     - name: Upload coverage results
@@ -77,3 +77,11 @@ jobs:
       with:
         name: pytest-results
         path: ./test-results/
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # Add your Codecov token in GitHub secrets
+        files: ./coverage-results/coverage.xml
+        flags: unittests
+        name: codecov-coverage-report
