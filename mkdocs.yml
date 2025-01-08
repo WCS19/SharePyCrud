@@ -11,7 +11,6 @@ nav:
   - Getting Started: setup.md
   - Changelog: CHANGELOG.md
   - Contributing: CONTRIBUTING.md
-  - Coverage: coverage/index.html
 
 # Add plugins
 plugins:
