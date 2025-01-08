@@ -8,7 +8,7 @@ theme:
 
 nav:
   - Home: INDEX.md
-  - Getting Started: SETUP.md
+  - Getting Started: setup.md
   - Changelog: CHANGELOG.md
   - Contributing: CONTRIBUTING.md
   - Coverage: coverage/index.html
