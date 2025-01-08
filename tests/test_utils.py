@@ -4,6 +4,50 @@ from unittest.mock import Mock, patch
 import requests
 from typing import cast
 from pytest_mock import MockerFixture
+from sharepycrud.utils import setup_client
+
+
+def test_setup_client_valid_env_vars(mocker: MockerFixture) -> None:
+    """Test setup_client with valid environment variables"""
+    # Mock SharePointConfig.from_env to return a valid configuration
+    mock_config = Mock()
+    mock_config.validate.return_value = (True, [])
+    mocker.patch(
+        "sharepycrud.utils.SharePointConfig.from_env", return_value=mock_config
+    )
+    mock_client = Mock()
+    mocker.patch("sharepycrud.client.SharePointClient", return_value=mock_client)
+
+    client = setup_client()
+    assert client is not None
+    assert client == mock_client
+
+
+def test_setup_client_missing_env_vars(mocker: MockerFixture) -> None:
+    """Test setup_client when environment variables are missing"""
+    # Mock SharePointConfig.from_env to simulate missing environment variables
+    mock_config = Mock()
+    mock_config.validate.return_value = (False, ["client_id", "client_secret"])
+    mocker.patch(
+        "sharepycrud.utils.SharePointConfig.from_env", return_value=mock_config
+    )
+
+    # Capture printed output
+    with patch("builtins.print") as mock_print:
+        client = setup_client()
+        assert client is None
+
+        # Debug captured print calls
+        print(
+            f"Captured print calls: {[call.args for call in mock_print.call_args_list]}"
+        )
+
+
+def test_setup_client_type_checking(mocker: MockerFixture) -> None:
+    """Test setup_client with TYPE_CHECKING enabled"""
+    with patch("sharepycrud.utils.TYPE_CHECKING", True):
+        # Ensure that the import inside TYPE_CHECKING works without issues
+        import sharepycrud.client
 
 
 def test_format_graph_url_debug() -> None:

@@ -76,6 +76,41 @@ def test_get_site_id_failure(client: SharePointClient, mocker: Mock) -> None:
     assert site_id is None
 
 
+def test_get_site_id_no_access_token(client: SharePointClient) -> None:
+    """Test get_site_id when access_token is missing"""
+    # Remove access_token
+    client.access_token = None
+
+    site_id = client.get_site_id(site_name="test-site")
+    assert site_id is None
+
+
+def test_get_site_id_no_site_name(client: SharePointClient) -> None:
+    """Test get_site_id when site_name is missing"""
+    with pytest.raises(ValueError, match="site_name is required"):
+        client.get_site_id(site_name="")
+
+
+def test_list_drive_ids_success(client: SharePointClient, mocker: Mock) -> None:
+    mock_response = {
+        "value": [
+            {"id": "drive1-id", "name": "drive1"},
+            {"id": "drive2-id", "name": "drive2"},
+        ]
+    }
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    drive_ids = client.list_drive_ids("test-site-id")
+    assert drive_ids == [("drive1-id", "drive1"), ("drive2-id", "drive2")]
+
+
+def test_list_drive_ids_failure(client: SharePointClient, mocker: Mock) -> None:
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=None)
+
+    drive_ids = client.list_drive_ids("test-site-id")
+    assert drive_ids == []
+
+
 def test_list_drives_success(client: SharePointClient, mocker: Mock) -> None:
     """Test successful drive listing"""
     mock_response = {
@@ -96,6 +131,81 @@ def test_list_drives_failure(client: SharePointClient, mocker: Mock) -> None:
 
     drives = client.list_drives("test-site-id")
     assert drives is None
+
+
+def test_list_drives_no_value(client: SharePointClient, mocker: Mock) -> None:
+    """Test list_drives when 'value' key is missing"""
+    mock_response = {}  # 'value' key is missing
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    drives = client.list_drives("test-site-id")
+    assert drives is None
+
+
+def test_list_drives_no_access_token(client: SharePointClient) -> None:
+    """Test list_drives when access_token is missing"""
+    # Remove access_token
+    client.access_token = None
+
+    drives = client.list_drives("test-site-id")
+    assert drives is None
+
+
+def test_list_drives_no_items_in_root_folder(
+    client: SharePointClient, mocker: Mock
+) -> None:
+    """Test list_drives when root folder has no items"""
+    # Mock drives response
+    mock_drives_response = {
+        "value": [
+            {"name": "drive1", "id": "drive1-id"},
+        ]
+    }
+    mocker.patch(
+        "sharepycrud.client.make_graph_request",
+        side_effect=[
+            mock_drives_response,  # First call: Drives response
+            {},  # Second call: Root contents missing "value"
+        ],
+    )
+
+    with patch("builtins.print") as mock_print:
+        drives = client.list_drives("test-site-id")
+        assert drives == mock_drives_response
+
+        # Assert "No items in root folder" was printed
+        mock_print.assert_any_call("No items in root folder")
+
+
+# def test_list_drives_success(client: SharePointClient, mocker: Mock) -> None:
+#     """Test successful drive listing"""
+#     mock_response = {
+#         "value": [
+#             {"name": "drive1", "id": "drive1-id"},
+#             {"name": "drive2", "id": "drive2-id"},
+#         ]
+#     }
+#     mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+#     drives = client.list_drives("test-site-id")
+#     assert drives == mock_response
+
+
+# def test_list_drives_failure(client: SharePointClient, mocker: Mock) -> None:
+#     """Test drive listing failure"""
+#     mocker.patch("sharepycrud.client.make_graph_request", return_value=None)
+
+#     drives = client.list_drives("test-site-id")
+#     assert drives is None
+
+
+# def test_list_drives_no_value(client: SharePointClient, mocker: Mock) -> None:
+#     """Test list_drives when 'value' key is missing"""
+#     mock_response = {}  # 'value' key is missing
+#     mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+#     drives = client.list_drives("test-site-id")
+#     assert drives is None
 
 
 def test_get_drive_id_success(client: SharePointClient, mocker: Mock) -> None:
@@ -205,3 +315,98 @@ def test_download_file_not_found(client: SharePointClient, mocker: Mock) -> None
 
     content = client.download_file("nonexistent.txt", "test-site", "test-drive")
     assert content is None
+
+
+def test_download_file_no_drive_id(client: SharePointClient, mocker: Mock) -> None:
+    """Test download_file when drive_id is None"""
+    mocker.patch.object(client, "get_site_id", return_value="test-site-id")
+    mocker.patch.object(client, "get_drive_id", return_value=None)
+
+    content = client.download_file("test.txt", "test-site", "test-drive")
+    assert content is None
+
+
+def test_download_file_http_error(client: SharePointClient, mocker: Mock) -> None:
+    """Test download_file when HTTP GET returns non-200 status code"""
+    # Mock site and drive ID lookups
+    mocker.patch.object(client, "get_site_id", return_value="test-site-id")
+    mocker.patch.object(client, "get_drive_id", return_value="test-drive-id")
+
+    # Mock file listing
+    mock_list_response = {"value": [{"id": "test-file-id", "name": "test.txt"}]}
+    mocker.patch(
+        "sharepycrud.client.make_graph_request", return_value=mock_list_response
+    )
+
+    # Mock file download
+    mock_download = Mock()
+    mock_download.status_code = 404  # Not found
+    mock_download.content = b""
+    mocker.patch("requests.get", return_value=mock_download)
+
+    content = client.download_file("test.txt", "test-site", "test-drive")
+    assert content is None
+
+
+def test_get_folder_content_success(client: SharePointClient, mocker: Mock) -> None:
+    mock_response = {
+        "value": [
+            {
+                "id": "item1-id",
+                "name": "item1",
+                "folder": {},
+                "parentReference": {"path": "/drives/drive-id/root/folder1"},
+                "webUrl": "http://example.com/item1",
+                "size": 1234,
+            },
+            {
+                "id": "item2-id",
+                "name": "item2",
+                "file": {},
+                "parentReference": {"path": "/drives/drive-id/root/folder1"},
+                "webUrl": "http://example.com/item2",
+                "size": 5678,
+            },
+        ]
+    }
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    contents = client.get_folder_content("test-drive-id", "folder-id")
+    expected_contents = [
+        {
+            "id": "item1-id",
+            "name": "item1",
+            "type": "folder",
+            "webUrl": "http://example.com/item1",
+            "size": 1234,
+        },
+        {
+            "id": "item2-id",
+            "name": "item2",
+            "type": "file",
+            "webUrl": "http://example.com/item2",
+            "size": 5678,
+        },
+    ]
+    assert contents == expected_contents
+
+
+def test_get_folder_content_failure(client: SharePointClient, mocker: Mock) -> None:
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=None)
+
+    contents = client.get_folder_content("test-drive-id", "folder-id")
+    assert contents is None
+
+
+# Edge case exception handling tests
+def test_list_sites_no_access_token(client: SharePointClient) -> None:
+    """Test list_sites when access_token is None"""
+    client.access_token = None
+    sites = client.list_sites()
+    assert sites is None
+
+
+def test_get_site_id_no_site_name(client: SharePointClient) -> None:
+    """Test get_site_id with no site_name"""
+    with pytest.raises(ValueError, match="site_name is required"):
+        client.get_site_id(site_name="")
