@@ -3,25 +3,24 @@ from sharepycrud.utils import setup_client
 
 
 def main() -> None:
-    """Example: List all sites, drives, and root contents in SharePoint site"""
+    """Example: Get drive ID by its name"""
     client = setup_client()
     if client is None:
         return
 
-    # Get site ID and list drives
-    sites = client.list_sites()
-    if not sites:
-        print("Failed to get sites")
-        return
-    print(f"Sites: {sites}")
-
-    # Get site ID
     site_id = client.get_site_id(site_name="TestSite1")
     if not site_id:
         print("Failed to get site ID")
         return
 
-    print(f"Site ID: {site_id}")
+    drive_id = client.get_drive_id(
+        site_id=site_id, drive_name="Files"
+    )  # Drive name set to "Files" since I created a files drive
+    if not drive_id:
+        print("Failed to get drive ID")
+        return
+
+    print(f"Drive ID: {drive_id}")
 
 
 if __name__ == "__main__":
@@ -29,4 +28,3 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         print(f"An error occurred: {e}")
-        raise
