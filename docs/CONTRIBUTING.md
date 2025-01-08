@@ -18,7 +18,7 @@ Thank you for considering contributing to SharePyCrud! Your contributions help m
      ```
 
 3. **Set Up the Environment**:
-   - Follow the setup instructions in the [SETUP.md](setup.md) file to configure your development environment.
+   - Follow the setup instructions in the [SETUP.md](SETUP.md) file to configure your development environment.
 
 4. **Add Upstream Remote**:
    - Add the original repository as an upstream remote to keep your fork updated:
@@ -108,4 +108,3 @@ If you encounter a bug or have a feature request:
 ---
 
 I appreciate your contributions! Thank you for helping improve SharePyCrud. 🚀
-

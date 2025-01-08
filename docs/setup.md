@@ -16,11 +16,12 @@ Before proceeding, ensure you have the following installed:
 
 ## Installation
 
-### For Users
+### ~~For Users~~
 
 ```bash
 pip install sharepycrud
 ```
+* **Note:** Package has not been released to PyPI yet. Still performing testing on TestPyPI.
 
 ### For Developers
 
@@ -77,8 +78,8 @@ Replace the placeholder values with the appropriate credentials for your SharePo
 
 Now that you have set up SharePyCrud, you can start using it to interact with your SharePoint environment. Here are some suggested next steps:
 
-1. Explore the examples provided in the `examples/` directory to learn how to perform common tasks. See the [README.md](README.md##Examples) for more information.
+1. Explore the examples provided in the `examples/` directory to learn how to perform common tasks. See the [INDEX.md](INDEX.md##Examples) for more information.
 
-2. Refer to the [Documentation References](README.md#documentation-references) for additional context and guidance.
+2. Refer to the [Documentation References](INDEX.md#documentation-references) for additional context and guidance.
 
 3. Contribute to the project! Check out the [CONTRIBUTING.md](CONTRIBUTING.md) file to learn how you can help improve SharePyCrud.
