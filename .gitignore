@@ -169,3 +169,6 @@ notes.txt
 
 # Ignore pypirc file
 .pypirc
+
+# Ignore coverage report
+docs/coverage
