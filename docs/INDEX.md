@@ -14,7 +14,7 @@ This package is a Python library for SharePoint CRUD operations. The package is 
 2. [Setup Instructions](#setup-instructions)
 3. [Contributing](#contributing)
 4. [Documentation References](#documentation-references)
-5. [Examples](<https://github.com/WCS19/SharePyCrud/tree/main/examples> "Examples Directory")
+5. [Examples](#examples)
 6. [Changelog](#changelog)
 7. [Github Repository](https://github.com/WCS19/SharePyCrud)
 8. [License](#license)
@@ -35,7 +35,7 @@ SharePyCrud simplifies interaction with SharePoint for CRUD (Create, Read, Updat
 
 ## Setup Instructions
 
-To use this package, follow the setup instructions provided in the [SETUP.md](SETUP.md) file. It includes step-by-step instructions to configure the package and set up your development environment.
+To use this package, follow the setup instructions provided in the [SETUP.md](setup.md) file. It includes step-by-step instructions to configure the package and set up your development environment.
 
 ---
 

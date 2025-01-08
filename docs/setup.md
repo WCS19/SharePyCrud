@@ -78,7 +78,8 @@ Replace the placeholder values with the appropriate credentials for your SharePo
 
 Now that you have set up SharePyCrud, you can start using it to interact with your SharePoint environment. Here are some suggested next steps:
 
-1. Explore the examples provided in the `examples/` directory to learn how to perform common tasks. See the [INDEX.md](INDEX.md##Examples) for more information.
+1. Explore the examples provided in the `examples/` directory to learn how to perform common tasks. See the [INDEX.md](INDEX.md#examples) for more information.
+
 
 2. Refer to the [Documentation References](INDEX.md#documentation-references) for additional context and guidance.
 
