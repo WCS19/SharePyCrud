@@ -3,6 +3,8 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 ![Tests Status](https://github.com/WCS19/SharePyCrud/actions/workflows/python-app.yml/badge.svg)
 [![codecov](https://codecov.io/gh/WCS19/SharePyCrud/branch/main/graph/badge.svg?token=<CODECOV_TOKEN>)](https://codecov.io/gh/WCS19/SharePyCrud)
+[![Documentation Status](https://readthedocs.org/projects/sharepycrud/badge/?version=latest)](https://sharepycrud.readthedocs.io/en/latest/)
+
 
 
 
