@@ -3,10 +3,9 @@ from sharepycrud.client import SharePointClient
 from sharepycrud.config import SharePointConfig
 from unittest.mock import Mock, patch
 from typing import Dict, List, Any
-from pytest_mock import MockerFixture
 
 
-@pytest.fixture(scope="function")  # type: ignore
+@pytest.fixture(scope="function")  # type: ignore[misc]
 def config() -> SharePointConfig:
     """Create a test configuration"""
     return SharePointConfig(
@@ -17,7 +16,7 @@ def config() -> SharePointConfig:
     )
 
 
-@pytest.fixture(scope="function")  # type: ignore
+@pytest.fixture(scope="function")  # type: ignore[misc]
 def client(config: SharePointConfig) -> SharePointClient:
     """Create a SharePointClient with mocked auth"""
     with patch("sharepycrud.client.make_graph_request") as mock_request:
