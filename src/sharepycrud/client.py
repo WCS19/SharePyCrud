@@ -34,6 +34,9 @@ class SharePointClient:
     def list_sites(self) -> Optional[List[Optional[str]]]:
         """List all sites
 
+        Args:
+            None
+
         Returns:
             Optional[List[Optional[str]]]: List of site names, or None if request fails.
             Individual site names can be None if they don't have a name.
@@ -52,21 +55,38 @@ class SharePointClient:
         return site_names
 
     def get_site_id(
-        self, sharepoint_url: Optional[str] = None, site_name: Optional[str] = None
+        self, site_name: str, sharepoint_url: Optional[str] = None
     ) -> Optional[str]:
-        """Get site ID from SharePoint URL"""
+        """Get site ID from SharePoint URL
+
+        Args:
+            site_name: Name of the SharePoint site (required)
+            sharepoint_url: Optional SharePoint URL, defaults to configured URL
+
+        Returns:
+            Optional[str]: Site ID if found, None otherwise
+        """
         if not self.access_token:
             return None
-        base_url = sharepoint_url or self.config.sharepoint_url
-        site = site_name
 
-        url = format_graph_url(f"sites/{base_url}:/sites/{site}")
+        if not site_name:
+            raise ValueError("site_name is required")
+
+        base_url = sharepoint_url or self.config.sharepoint_url
+        url = format_graph_url(f"sites/{base_url}:/sites/{site_name}")
         response = make_graph_request(url, self.access_token)
 
         return response.get("id") if response else None
 
     def list_drives(self, site_id: str) -> Optional[Dict[str, Any]]:
-        """List all drives and their root contents"""
+        """List all drives and their root contents
+
+        Args:
+            site_id: ID of the SharePoint site
+
+        Returns:
+            Optional[Dict[str, Any]]: Dictionary of drives and their root contents, or None if request fails.
+        """
         if not self.access_token:
             return None
         url = format_graph_url("sites", site_id, "drives")
@@ -93,7 +113,15 @@ class SharePointClient:
         return None
 
     def get_drive_id(self, site_id: str, drive_name: str) -> Optional[str]:
-        """Get drive ID by its name"""
+        """Get drive ID by its name
+
+        Args:
+            site_id: ID of the SharePoint site
+            drive_name: Name of the drive
+
+        Returns:
+            Optional[str]: Drive ID if found, None otherwise
+        """
         if not self.access_token:
             return None
         url = format_graph_url("sites", site_id, "drives")
@@ -187,7 +215,7 @@ class SharePointClient:
     def download_file(
         self,
         file_path: str,
-        site_name: Optional[str] = None,
+        site_name: str,
         drive_name: Optional[str] = None,
     ) -> Optional[bytes]:
         """Download a file from SharePoint

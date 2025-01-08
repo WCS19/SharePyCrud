@@ -58,13 +58,3 @@ def format_graph_url(base_path: str, *args: str) -> str:
     if not args:
         return f"https://graph.microsoft.com/v1.0/{base_path}"
     return f"https://graph.microsoft.com/v1.0/{base_path}/{'/'.join(encoded_args)}"
-
-
-# Debug function for development
-def print_config(config: SharePointConfig) -> None:
-    """Print the configuration values"""
-    print("Config values:")
-    print(f"Tenant ID: {config.tenant_id}")
-    print(f"Client ID: {config.client_id}")
-    print(f"Client Secret: {'*' * len(config.client_secret)}")
-    print(f"SharePoint URL: {config.sharepoint_url}")
