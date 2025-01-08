@@ -35,7 +35,7 @@ SharePyCrud simplifies interaction with SharePoint for CRUD (Create, Read, Updat
 
 ## Setup Instructions
 
-To use this package, follow the setup instructions provided in the [SETUP.md](docs/SETUP.md) file. It includes step-by-step instructions to configure the package and set up your development environment.
+To use this package, follow the setup instructions provided in the [SETUP.md](docs/setup.md) file. It includes step-by-step instructions to configure the package and set up your development environment.
 
 ---
 
