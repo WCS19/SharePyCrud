@@ -7,7 +7,7 @@ theme:
 
 
 nav:
-  - Home: INDEX.md
+  - Home: index.md
   - Getting Started: setup.md
   - Changelog: CHANGELOG.md
   - Contributing: CONTRIBUTING.md
