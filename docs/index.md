@@ -86,7 +86,7 @@ See the [CHANGELOG.md](CHANGELOG.md) file for the latest updates and planned fea
 
 ### Github Repository
 
-Please visit the Github repository for all the latest documentation.
+Please visit the Github repository for all the latest code updates.
 
 [SharePyCrud Github Repository](https://github.com/WCS19/SharePyCrud)
 

@@ -20,7 +20,7 @@ This package is a Python library for SharePoint CRUD operations. The package is 
 4. [Documentation References](#documentation-references)
 5. [Examples](<https://github.com/WCS19/SharePyCrud/tree/main/examples> "Examples Directory")
 6. [Changelog](#changelog)
-7. [Github Repository](https://github.com/WCS19/SharePyCrud)
+7. [ReadTheDocs Documentation](#readthedocs-documentation)
 8. [License](#license)
 
 
@@ -86,11 +86,11 @@ See the [CHANGELOG.md](docs/CHANGELOG.md) file for the latest updates and planne
 
 ---
 
-### Github Repository
+### ReadTheDocs Documentation
 
-Please visit the Github repository for all the latest documentation.
+Please visit the ReadTheDocs page for all the latest documentation.
 
-[SharePyCrud Github Repository](https://github.com/WCS19/SharePyCrud)
+[SharePyCrud ReadTheDocs](https://sharepycrud.readthedocs.io/en/latest/)
 
 ---
 
