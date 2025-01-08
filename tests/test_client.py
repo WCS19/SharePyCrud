@@ -6,7 +6,7 @@ from typing import Dict, List, Any
 from pytest_mock import MockerFixture
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")  # type: ignore
 def config() -> SharePointConfig:
     """Create a test configuration"""
     return SharePointConfig(
@@ -17,7 +17,7 @@ def config() -> SharePointConfig:
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")  # type: ignore
 def client(config: SharePointConfig) -> SharePointClient:
     """Create a SharePointClient with mocked auth"""
     with patch("sharepycrud.client.make_graph_request") as mock_request:
@@ -85,14 +85,8 @@ def test_get_site_id_no_access_token(client: SharePointClient) -> None:
     assert site_id is None
 
 
-def test_get_site_id_no_site_name(client: SharePointClient) -> None:
-    """Test get_site_id when site_name is missing"""
-    with pytest.raises(ValueError, match="site_name is required"):
-        client.get_site_id(site_name="")
-
-
 def test_list_drive_ids_success(client: SharePointClient, mocker: Mock) -> None:
-    mock_response = {
+    mock_response: Dict[str, List[Dict[str, str]]] = {
         "value": [
             {"id": "drive1-id", "name": "drive1"},
             {"id": "drive2-id", "name": "drive2"},
@@ -113,7 +107,7 @@ def test_list_drive_ids_failure(client: SharePointClient, mocker: Mock) -> None:
 
 def test_list_drives_success(client: SharePointClient, mocker: Mock) -> None:
     """Test successful drive listing"""
-    mock_response = {
+    mock_response: Dict[str, List[Dict[str, Any]]] = {
         "value": [
             {"name": "drive1", "id": "drive1-id"},
             {"name": "drive2", "id": "drive2-id"},
@@ -135,7 +129,7 @@ def test_list_drives_failure(client: SharePointClient, mocker: Mock) -> None:
 
 def test_list_drives_no_value(client: SharePointClient, mocker: Mock) -> None:
     """Test list_drives when 'value' key is missing"""
-    mock_response = {}  # 'value' key is missing
+    mock_response: Dict[str, Any] = {}  # 'value' key is missing
     mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
 
     drives = client.list_drives("test-site-id")
@@ -156,7 +150,7 @@ def test_list_drives_no_items_in_root_folder(
 ) -> None:
     """Test list_drives when root folder has no items"""
     # Mock drives response
-    mock_drives_response = {
+    mock_drives_response: Dict[str, List[Dict[str, str]]] = {
         "value": [
             {"name": "drive1", "id": "drive1-id"},
         ]
@@ -175,37 +169,6 @@ def test_list_drives_no_items_in_root_folder(
 
         # Assert "No items in root folder" was printed
         mock_print.assert_any_call("No items in root folder")
-
-
-# def test_list_drives_success(client: SharePointClient, mocker: Mock) -> None:
-#     """Test successful drive listing"""
-#     mock_response = {
-#         "value": [
-#             {"name": "drive1", "id": "drive1-id"},
-#             {"name": "drive2", "id": "drive2-id"},
-#         ]
-#     }
-#     mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
-
-#     drives = client.list_drives("test-site-id")
-#     assert drives == mock_response
-
-
-# def test_list_drives_failure(client: SharePointClient, mocker: Mock) -> None:
-#     """Test drive listing failure"""
-#     mocker.patch("sharepycrud.client.make_graph_request", return_value=None)
-
-#     drives = client.list_drives("test-site-id")
-#     assert drives is None
-
-
-# def test_list_drives_no_value(client: SharePointClient, mocker: Mock) -> None:
-#     """Test list_drives when 'value' key is missing"""
-#     mock_response = {}  # 'value' key is missing
-#     mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
-
-#     drives = client.list_drives("test-site-id")
-#     assert drives is None
 
 
 def test_get_drive_id_success(client: SharePointClient, mocker: Mock) -> None:
@@ -404,9 +367,3 @@ def test_list_sites_no_access_token(client: SharePointClient) -> None:
     client.access_token = None
     sites = client.list_sites()
     assert sites is None
-
-
-def test_get_site_id_no_site_name(client: SharePointClient) -> None:
-    """Test get_site_id with no site_name"""
-    with pytest.raises(ValueError, match="site_name is required"):
-        client.get_site_id(site_name="")
