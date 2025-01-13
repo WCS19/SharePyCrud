@@ -248,6 +248,190 @@ def test_list_all_folders_failure(client: SharePointClient, mocker: Mock) -> Non
     assert folders == []
 
 
+def test_list_parent_folders_success(client: SharePointClient, mocker: Mock) -> None:
+    """Test successful parent folders listing"""
+    mock_response = {
+        "value": [
+            {
+                "name": "folder1",
+                "id": "folder1-id",
+                "folder": {},
+                "parentReference": {"path": "/drives/root"},
+            },
+            {
+                "name": "file1",
+                "id": "file1-id",
+                "parentReference": {"path": "/drives/root"},
+            },
+            {
+                "name": "folder2",
+                "id": "folder2-id",
+                "folder": {},
+                "parentReference": {"path": "/drives/root"},
+            },
+        ]
+    }
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    folders = client.list_parent_folders("test-drive-id")
+    expected_folders = [
+        {
+            "name": "folder1",
+            "path": "/drives/root/folder1",
+        },
+        {
+            "name": "folder2",
+            "path": "/drives/root/folder2",
+        },
+    ]
+    assert folders == expected_folders
+
+
+def test_list_parent_folders_no_access_token(client: SharePointClient) -> None:
+    """Test list_parent_folders when access_token is None"""
+    client.access_token = None
+    result = client.list_parent_folders("test-drive-id")
+    assert result is None
+
+
+def test_list_parent_folders_invalid_response(
+    client: SharePointClient, mocker: Mock, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Test list_parent_folders when response is not a dictionary"""
+    mock_response = ["not_a_dict"]
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    result = client.list_parent_folders("test-drive-id")
+    captured = capsys.readouterr()
+
+    assert result is None
+    assert "Unexpected response format" in captured.out
+
+
+def test_list_parent_folders_error_response(
+    client: SharePointClient, mocker: Mock, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Test list_parent_folders when response contains an error"""
+    mock_response = {
+        "error": {"code": "InvalidRequest", "message": "The folder could not be found"}
+    }
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    result = client.list_parent_folders("test-drive-id")
+    captured = capsys.readouterr()
+
+    assert result is None
+    assert "Error getting folder contents: InvalidRequest" in captured.out
+    assert "Message: The folder could not be found" in captured.out
+
+
+def test_list_parent_folders_empty_response(
+    client: SharePointClient, mocker: Mock
+) -> None:
+    """Test list_parent_folders when response is empty"""
+    mock_response: Dict[str, List[Any]] = {"value": []}
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    folders = client.list_parent_folders("test-drive-id")
+    assert folders == []
+
+
+def test_list_parent_folders_no_folders(client: SharePointClient, mocker: Mock) -> None:
+    """Test list_parent_folders when response contains only files"""
+    mock_response = {
+        "value": [
+            {
+                "name": "file1",
+                "id": "file1-id",
+                "parentReference": {"path": "/drives/root"},
+            },
+            {
+                "name": "file2",
+                "id": "file2-id",
+                "parentReference": {"path": "/drives/root"},
+            },
+        ]
+    }
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    folders = client.list_parent_folders("test-drive-id")
+    assert folders == []
+
+
+def test_get_folder_id_success(client: SharePointClient, mocker: Mock) -> None:
+    """Test successful folder ID retrieval"""
+    mock_response: Dict[str, List[Dict[str, Any]]] = {
+        "value": [
+            {
+                "name": "folder1",
+                "id": "folder1-id",
+                "folder": {},
+            },
+            {
+                "name": "target_folder",
+                "id": "target-folder-id",
+                "folder": {},
+            },
+            {
+                "name": "folder2",
+                "id": "folder2-id",
+                "folder": {},
+            },
+        ]
+    }
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    folder_id = client.get_folder_id("test-drive-id", "target_folder")
+    assert folder_id == "target-folder-id"
+
+
+def test_get_folder_id_not_found(client: SharePointClient, mocker: Mock) -> None:
+    """Test folder ID retrieval when folder doesn't exist"""
+    mock_response: Dict[str, List[Dict[str, Any]]] = {
+        "value": [
+            {
+                "name": "folder1",
+                "id": "folder1-id",
+                "folder": {},
+            },
+            {
+                "name": "folder2",
+                "id": "folder2-id",
+                "folder": {},
+            },
+        ]
+    }
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    folder_id = client.get_folder_id("test-drive-id", "nonexistent_folder")
+    assert folder_id is None
+
+
+def test_get_folder_id_no_access_token(client: SharePointClient) -> None:
+    """Test get_folder_id when access_token is None"""
+    client.access_token = None
+    result = client.get_folder_id("test-drive-id", "folder1")
+    assert result is None
+
+
+def test_get_folder_id_empty_response(client: SharePointClient, mocker: Mock) -> None:
+    """Test get_folder_id when response is empty"""
+    mock_response: Dict[str, List[Any]] = {"value": []}
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    folder_id = client.get_folder_id("test-drive-id", "folder1")
+    assert folder_id is None
+
+
+def test_get_folder_id_invalid_response(client: SharePointClient, mocker: Mock) -> None:
+    """Test get_folder_id when response is invalid"""
+    mock_response = None
+    mocker.patch("sharepycrud.client.make_graph_request", return_value=mock_response)
+
+    folder_id = client.get_folder_id("test-drive-id", "folder1")
+    assert folder_id is None
+
+
 def test_download_file_success(client: SharePointClient, mocker: Mock) -> None:
     """Test successful file download"""
     # Mock site and drive ID lookups
