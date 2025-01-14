@@ -1,12 +1,14 @@
-from sharepycrud.client import SharePointClient
-from sharepycrud.utils import setup_client
+from sharepycrud.readClient import ReadClient
+from sharepycrud.config import SharePointConfig
 
 
 def main() -> None:
     """Example: Get drive ID by its name"""
-    client = setup_client()
-    if client is None:
-        return
+    # Initialize configuration
+    config = SharePointConfig.from_env()
+
+    # Initialize ReadClient
+    client = ReadClient(config)
 
     site_id = client.get_site_id(site_name="TestSite1")
     if not site_id:

@@ -1,13 +1,12 @@
-from sharepycrud.client import SharePointClient
-from sharepycrud.utils import setup_client
+from sharepycrud.readClient import ReadClient
+from sharepycrud.config import SharePointConfig
 import os
 
 
 def main() -> None:
     """Example: Download a file from SharePoint"""
-    client = setup_client()
-    if client is None:
-        return
+    config = SharePointConfig.from_env()
+    client = ReadClient(config)
 
     # Download and save file
     file_content = client.download_file(

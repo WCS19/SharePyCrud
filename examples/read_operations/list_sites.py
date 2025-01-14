@@ -1,12 +1,11 @@
-from sharepycrud.client import SharePointClient
-from sharepycrud.utils import setup_client
+from sharepycrud.readClient import ReadClient
+from sharepycrud.config import SharePointConfig
 
 
 def main() -> None:
     """Example: List all sites, drives, and root contents in SharePoint site"""
-    client = setup_client()
-    if client is None:
-        return
+    config = SharePointConfig.from_env()
+    client = ReadClient(config)
 
     # Get site ID and list drives
     sites = client.list_sites()

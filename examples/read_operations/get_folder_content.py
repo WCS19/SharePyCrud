@@ -1,12 +1,11 @@
-from sharepycrud.client import SharePointClient
-from sharepycrud.utils import setup_client
+from sharepycrud.readClient import ReadClient
+from sharepycrud.config import SharePointConfig
 
 
 def main() -> None:
     """Example: List drives and root contents in SharePoint site"""
-    client = setup_client()
-    if client is None:
-        return
+    config = SharePointConfig.from_env()
+    client = ReadClient(config)
 
     site_id = client.get_site_id(site_name="TestSite1")
     if not site_id:
@@ -19,7 +18,7 @@ def main() -> None:
         print("Failed to get drive ID")
         return
 
-    folder_id = client.get_folder_id(drive_id, "Folder1Test")
+    folder_id = client.get_root_folder_id_by_name(drive_id, "Folder1Test")
     print(f"Folder ID: {folder_id}")
     if not folder_id:
         print("Failed to get folder ID")
