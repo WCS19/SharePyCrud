@@ -7,18 +7,19 @@
 
 """SharePyCrud: A Python library for SharePoint CRUD operations."""
 
-__version__ = "0.1.0.dev1"
+__version__ = "0.2.0.dev1"
 
 from .auth import SharePointAuth
 from .config import SharePointConfig
-from .client import SharePointClient
-from .utils import make_graph_request, format_graph_url, setup_client
+from .baseClient import BaseClient
+from .createClient import CreateClient
+from .readClient import ReadClient
 
 __all__ = [
     "SharePointAuth",
     "SharePointConfig",
+    "BaseClient",
+    "CreateClient",
+    "ReadClient",
     "SharePointClient",
-    "make_graph_request",
-    "format_graph_url",
-    "setup_client",
 ]
