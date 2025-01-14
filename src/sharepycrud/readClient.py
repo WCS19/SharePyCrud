@@ -1,39 +1,14 @@
-from typing import Dict, List, Optional, Tuple, Any
-import os
-from .utils import make_graph_request, format_graph_url
-from .config import SharePointConfig
-from requests import Response, request
+from sharepycrud.baseClient import BaseClient
+from sharepycrud.config import SharePointConfig
+from typing import Optional, List, Dict, Any, Tuple
 import requests
-
-# TODO: ADD DOCUMENTATATION FOR MICROSOFT APP REGISTRATION SETUP
-# TODO: DOCUMENTATION SHOULD BE REFERENCED IN README.MD BUT STANDALONE MD FILE IN DOCS FOLDER
+from requests import Response
 
 
-class SharePointClient:
+class ReadClient(BaseClient):
     def __init__(self, config: SharePointConfig):
-        """Initialize SharePoint client with configuration"""
-        self.config = config
-        self.access_token = self._get_access_token()
-        if not self.access_token:
-            raise ValueError("Failed to obtain access token")
+        super().__init__(config)
 
-    def _get_access_token(self) -> Optional[str]:
-        """Get access token from Azure AD"""
-        url = f"https://login.microsoftonline.com/{self.config.tenant_id}/oauth2/v2.0/token"
-        headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        body = {
-            "grant_type": "client_credentials",
-            "client_id": self.config.client_id,
-            "client_secret": self.config.client_secret,
-            "scope": "https://graph.microsoft.com/.default",
-        }
-
-        response = make_graph_request(url, "", method="POST", data=body)
-        return response.get("access_token") if response else None
-
-    ##################################################################################
-    # Read Logic
-    ##################################################################################
     def list_sites(self) -> Optional[List[Optional[str]]]:
         """List all sites
 
@@ -41,13 +16,13 @@ class SharePointClient:
             None
 
         Returns:
-            Optional[List[Optional[str]]]: List of site names, or None if request fails.
+            List of site names, or None if request fails.
             Individual site names can be None if they don't have a name.
         """
         if not self.access_token:
             return None
-        url = format_graph_url("sites")
-        response = make_graph_request(url, self.access_token)
+        url = self.format_graph_url("sites")
+        response = self.make_graph_request(url)
 
         # Extract site names, allowing for None values
         site_names = (
@@ -60,40 +35,40 @@ class SharePointClient:
     def get_site_id(
         self, site_name: str, sharepoint_url: Optional[str] = None
     ) -> Optional[str]:
-        """Get site ID from SharePoint URL
+        """Get site ID from SharePoint URL.
 
         Args:
             site_name: Name of the SharePoint site (required)
             sharepoint_url: Optional SharePoint URL, defaults to configured URL
 
         Returns:
-            Optional[str]: Site ID if found, None otherwise
+            Site ID if found, None otherwise
         """
         if not self.access_token:
             return None
 
         if not site_name:
-            raise ValueError("site_name is required")
+            return None
 
         base_url = sharepoint_url or self.config.sharepoint_url
-        url = format_graph_url(f"sites/{base_url}:/sites/{site_name}")
-        response = make_graph_request(url, self.access_token)
+        url = self.format_graph_url(f"sites/{base_url}:/sites/{site_name}")
+        response = self.make_graph_request(url)
 
         return response.get("id") if response else None
 
     def list_drives(self, site_id: str) -> Optional[Dict[str, Any]]:
-        """List all drives and their root contents
+        """List all drives and their root contents.
 
         Args:
             site_id: ID of the SharePoint site
 
         Returns:
-            Optional[Dict[str, Any]]: Dictionary of drives and their root contents, or None if request fails.
+            Dictionary of drives and their root contents, or None if request fails.
         """
         if not self.access_token:
             return None
-        url = format_graph_url("sites", site_id, "drives")
-        response = make_graph_request(url, self.access_token)
+        url = self.format_graph_url("sites", site_id, "drives")
+        response = self.make_graph_request(url)
 
         if response and "value" in response:
             print("=== Drives ===:")
@@ -101,8 +76,10 @@ class SharePointClient:
                 print(f"\nDrive: {drive['name']}, ID: {drive['id']}")
 
                 # Get root folder contents
-                root_url = format_graph_url("drives", drive["id"], "root", "children")
-                root_contents = make_graph_request(root_url, self.access_token)
+                root_url = self.format_graph_url(
+                    "drives", drive["id"], "root", "children"
+                )
+                root_contents = self.make_graph_request(root_url)
 
                 if root_contents and "value" in root_contents:
                     print("Root contents:")
@@ -116,28 +93,26 @@ class SharePointClient:
         return None
 
     def get_drive_id(self, site_id: str, drive_name: str) -> Optional[str]:
-        """Get drive ID by its name
+        """Get drive ID by its name.
 
         Args:
             site_id: ID of the SharePoint site
             drive_name: Name of the drive
 
         Returns:
-            Optional[str]: Drive ID if found, None otherwise
+            Drive ID if found, None otherwise
         """
         if not self.access_token:
             return None
-        url = format_graph_url("sites", site_id, "drives")
-        response = make_graph_request(url, self.access_token)
+        url = self.format_graph_url("sites", site_id, "drives")
+        response = self.make_graph_request(url)
 
-        # Check if response exists and has a 'value' key
         if not response or "value" not in response:
             return None
 
         # Type hint for the drives list
         drives: List[Dict[str, Any]] = response["value"]
 
-        # Look for matching drive name
         for drive in drives:
             if isinstance(drive, dict) and drive.get("name") == drive_name:
                 drive_id = drive.get("id")
@@ -147,23 +122,41 @@ class SharePointClient:
         return None
 
     def list_drive_ids(self, site_id: str) -> List[Tuple[str, str]]:
-        """Get all drive IDs and names for a site"""
+        """Get all drive IDs and names for a site.
+
+        Args:
+            site_id: ID of the SharePoint site
+
+        Returns:
+            List of tuples containing drive IDs and names, or an empty list if no drives are found.
+        """
         if not self.access_token:
             return []
-        url = format_graph_url("sites", site_id, "drives")
-        response = make_graph_request(url, self.access_token)
+        url = self.format_graph_url("sites", site_id, "drives")
+        response = self.make_graph_request(url)
         drives = response.get("value", []) if response else []
         return [(drive["id"], drive["name"]) for drive in drives]
 
     def list_all_folders(
         self, drive_id: str, parent_path: str = "root", level: int = 0
     ) -> List[Dict[str, Any]]:
-        """Recursively list all folders within a drive"""
+        """Recursively list all folders within a drive.
+
+        Args:
+            drive_id: ID of the drive.
+            parent_path: Path of the parent folder.
+            level: Current level of recursion.
+
+        Returns:
+            A list of folders within the specified parent path.
+        """
         if not self.access_token:
             return []
 
-        url = format_graph_url("drives", drive_id, "items", parent_path, "children")
-        response = make_graph_request(url, self.access_token)
+        url = self.format_graph_url(
+            "drives", drive_id, "items", parent_path, "children"
+        )
+        response = self.make_graph_request(url)
 
         folders: List[Dict[str, Any]] = []
         if not response or "value" not in response:
@@ -197,8 +190,8 @@ class SharePointClient:
         if not self.access_token:
             return None
 
-        url = format_graph_url("drives", drive_id, "root/children")
-        response = make_graph_request(url, self.access_token)
+        url = self.format_graph_url("drives", drive_id, "root/children")
+        response = self.make_graph_request(url)
 
         # Ensure response is a dictionary
         if not isinstance(response, dict):
@@ -223,12 +216,22 @@ class SharePointClient:
 
         return parent_folders
 
-    def get_folder_id(self, drive_id: str, folder_name: str) -> Optional[str]:
-        """Get folder ID by its name"""
+    def get_root_folder_id_by_name(
+        self, drive_id: str, folder_name: str
+    ) -> Optional[str]:
+        """Get a drive's root folder ID by its name.
+
+        Args:
+            drive_id: ID of the drive.
+            folder_name: Name of the folder.
+
+        Returns:
+            The ID of the root folder, or None if not found.
+        """
         if not self.access_token:
             return None
-        url = format_graph_url("drives", drive_id, "root/children")
-        response = make_graph_request(url, self.access_token)
+        url = self.format_graph_url("drives", drive_id, "root/children")
+        response = self.make_graph_request(url)
         if response and "value" in response:
             for item in response["value"]:
                 if item.get("name") == folder_name:
@@ -240,12 +243,20 @@ class SharePointClient:
     def get_folder_content(
         self, drive_id: str, folder_id: str
     ) -> Optional[List[Dict[str, Any]]]:
-        """Get contents of a folder using its ID"""
+        """Get contents of a folder using its ID.
+
+        Args:
+            drive_id: ID of the drive.
+            folder_id: ID of the folder.
+
+        Returns:
+            A list of folder contents, or None if the request fails.
+        """
         if not self.access_token:
             return None
 
-        url = format_graph_url("drives", drive_id, "items", folder_id, "children")
-        response = make_graph_request(url, self.access_token)
+        url = self.format_graph_url("drives", drive_id, "items", folder_id, "children")
+        response = self.make_graph_request(url)
 
         if not response:
             return None
@@ -265,6 +276,86 @@ class SharePointClient:
         print(f"Found {len(folder_contents)} items in folder")  # Debug print
         return folder_contents
 
+    def get_nested_folder_info(
+        self, drive_id: str, folder_path: str
+    ) -> Optional[Dict[str, str]]:
+        """
+        Validate and find the ID and name of the deepest folder in a nested folder path.
+
+        Args:
+            drive_id: ID of the drive.
+            folder_path: Full path of the nested folder structure (e.g., "Folder1/FolderNest1/FolderNest2").
+
+        Returns:
+            A dictionary with the 'id' and 'name' of the deepest folder, or None if any folder in the hierarchy is missing.
+        """
+        if not self.access_token:
+            return None
+
+        folder_names = self.parse_folder_path(folder_path)
+        current_parent_id = "root"
+        deepest_folder_name: Optional[str] = None
+
+        for folder_name in folder_names:
+            url = self.format_graph_url(
+                "drives", drive_id, "items", current_parent_id, "children"
+            )
+            response = self.make_graph_request(url)
+
+            if "value" in response:
+                folders = [
+                    item
+                    for item in response["value"]
+                    if item["name"] == folder_name and "folder" in item
+                ]
+                if (
+                    folders
+                    and isinstance(folders[0]["id"], str)
+                    and isinstance(folders[0]["name"], str)
+                ):
+                    current_parent_id = folders[0]["id"]
+                    deepest_folder_name = folders[0]["name"]
+                else:
+                    print(f"Folder '{folder_name}' not found in path '{folder_path}'.")
+                    return None
+            else:
+                print(f"Error validating folder path. Response: {response}")
+                return None
+
+        if deepest_folder_name is None:
+            return None
+
+        return {"id": current_parent_id, "name": deepest_folder_name}
+
+    def file_exists_in_folder(
+        self, drive_id: str, folder_id: str, file_name: str
+    ) -> bool:
+        """
+        Check if a file with the given name exists in a specified folder.
+
+        Args:
+            drive_id: ID of the drive.
+            folder_id: ID of the folder to search in.
+            file_name: Name of the file to check.
+
+        Returns:
+            True if the file exists, False otherwise.
+        """
+        if not self.access_token:
+            return False
+
+        url = self.format_graph_url("drives", drive_id, "items", folder_id, "children")
+        response = self.make_graph_request(url)
+
+        if "value" in response:
+            # Look for a file with the same name
+            for item in response["value"]:
+                if item.get("name") == file_name and "file" in item:
+                    return True
+        else:
+            print(f"Error checking file existence. Response: {response}")
+        return False
+
     def download_file(
         self, file_path: str, site_name: str, drive_name: Optional[str] = None
     ) -> Optional[bytes]:
@@ -282,23 +373,20 @@ class SharePointClient:
             print("No access token available")
             return None
 
-        # Get site ID
         site_id = self.get_site_id(site_name=site_name)
         if not site_id:
             print("Failed to get site ID")
             return None
 
-        # Get drive ID
         drive_id = self.get_drive_id(site_id, drive_name) if drive_name else None
         if not drive_id:
             print(f"Drive '{drive_name}' not found")
             return None
 
-        # Download file - using items endpoint
-        url = format_graph_url("drives", drive_id, "root/children")
+        url = self.format_graph_url("drives", drive_id, "root/children")
 
-        # First, get the file ID
-        list_response = make_graph_request(url, self.access_token)
+        # Get the file ID
+        list_response = self.make_graph_request(url)
         if not list_response or "value" not in list_response:
             print("Failed to list drive contents")
             return None
@@ -313,8 +401,9 @@ class SharePointClient:
             print(f"File '{file_path}' not found in drive")
             return None
 
-        # Now download the file using its ID
-        download_url = format_graph_url("drives", drive_id, "items", file_id, "content")
+        download_url = self.format_graph_url(
+            "drives", drive_id, "items", file_id, "content"
+        )
         headers = {
             "Authorization": f"Bearer {self.access_token}",
         }
