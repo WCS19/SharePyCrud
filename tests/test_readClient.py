@@ -163,7 +163,7 @@ def test_get_site_id_no_site_name(
     Test get_site_id returns None if site name is not provided.
     """
     mock_request.return_value = MagicMock()
-    site_id: Optional[str] = read_client.get_site_id(None)
+    site_id: Optional[str] = read_client.get_site_id("")
     assert site_id is None
     mock_request.assert_not_called()
 
