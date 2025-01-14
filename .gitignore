@@ -172,3 +172,6 @@ notes.txt
 
 # Ignore coverage report
 docs/coverage
+
+# Ignore files upload txt file
+upload_test.txt
