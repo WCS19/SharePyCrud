@@ -22,6 +22,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Black code formatting
 - Pre-commit hooks for code quality
 
+## [0.2.0.dev1] - 2025-01-14
+
+### Added
+- WRITE operations:
+  - Upload files to SharePoint
+  - Create lists
+  - Create document libraries
+  - Create folders
+
+
+### Improved
+- Refactored existing SharePointClient class.
+  - As project scaled, it became apparent that the client class was becoming too large and complex.
+  - This refactoring splits the client class into smaller, more manageable classes (BaseClient, CreateClient, ReadClient).
+  - Removed utils module and moved functions to BaseClient.
+- Improved existing test suite
+
+
 ### Dependencies
 - Python 3.11+ requirement
 - Core dependencies:

@@ -8,7 +8,7 @@
 
 
 
-This package is a Python library for SharePoint CRUD operations. The package is currently in development with only **read operations** implemented. Create, Update, and Delete operations are under development and will be added in future releases.
+This package is a Python library for SharePoint CRUD operations. The package is currently in development with only **read** and **write** operations implemented. Update and Delete operations are under development and will be added in future releases.
 
 ---
 
@@ -32,8 +32,10 @@ SharePyCrud simplifies interaction with SharePoint for CRUD (Create, Read, Updat
 
 - Accessing files and folders in SharePoint document libraries.
 - Downloading files in SharePoint sites.
-- Creating folders and subfolders (planned).
-- Updating and deleting files (planned).
+- Creating folders and subfolders.
+- Uploading files to SharePoint sites.
+- Creating lists in SharePoint sites.
+- Updating and deleting files (planned) and more!
 
 ---
 
@@ -66,15 +68,15 @@ These resources will provide background on the APIs and libraries used in this p
 Use the `examples` directory to run existing examples of read operations.
 
 ```bash
-python examples/list_drives.py
+python examples/read_operations/list_drives.py
 ```
 
 ```bash
-python examples/list_sites.py
+python examples/read_operations/list_sites.py
 ```
 
 ```bash
-python examples/download_file.py
+python examples/write_operations/nested_folder_file_upload.py
 ```
 
 There are currently only examples for the read operations. Examples for the other operations will be added in future releases.
