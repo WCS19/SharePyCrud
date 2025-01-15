@@ -1,12 +1,14 @@
-from sharepycrud.createClient import CreateClient
-from sharepycrud.readClient import ReadClient
+from sharepycrud.clientFactory import ClientFactory
 from sharepycrud.config import SharePointConfig
+from sharepycrud.logger import setup_logging
 
 
 def main() -> None:
+    setup_logging(level="DEBUG", log_file="create_folder_example.log")
+
     config = SharePointConfig.from_env()
-    create_client = CreateClient(config)
-    read_client = ReadClient(config)
+    create_client = ClientFactory.create_write_client(config)
+    read_client = ClientFactory.create_read_client(config)
 
     site_id = read_client.get_site_id(site_name="TestSite1")
     if site_id is None:
@@ -18,12 +20,10 @@ def main() -> None:
         print("Failed to get drive ID")
         return
 
-    folder_id = create_client.create_folder(drive_id, "New Folder 1")
+    folder_id = create_client.create_folder(drive_id, "New Folder 7")
     if folder_id is None:
         print("Failed to create folder")
         return
-
-    print(f"Folder created successfully with ID: {folder_id}")
 
 
 if __name__ == "__main__":
