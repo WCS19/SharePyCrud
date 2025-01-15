@@ -16,12 +16,13 @@ This package is a Python library for SharePoint CRUD operations. The package is 
 
 1. [Introduction](#introduction)
 2. [Setup Instructions](#setup-instructions)
-3. [Contributing](#contributing)
-4. [Documentation References](#documentation-references)
-5. [Examples](<https://github.com/WCS19/SharePyCrud/tree/main/examples> "Examples Directory")
-6. [Changelog](#changelog)
-7. [ReadTheDocs Documentation](#readthedocs-documentation)
-8. [License](#license)
+3. [Architecture](#architecture)
+4. [Contributing](#contributing)
+5. [Documentation References](#documentation-references)
+6. [Examples](<https://github.com/WCS19/SharePyCrud/tree/main/examples> "Examples Directory")
+7. [Changelog](#changelog)
+8. [ReadTheDocs Documentation](#readthedocs-documentation)
+9. [License](#license)
 
 
 ---
@@ -45,6 +46,12 @@ To use this package, follow the setup instructions provided in the [SETUP.md](do
 
 ---
 
+## Architecture
+
+The package is designed to be modular and easy to understand. The [ARCHITECTURE.md](docs/ARCHITECTURE.md) file provides a detailed overview of the package's architecture and design.
+
+---
+
 ## Contributing
 
 We welcome contributions to SharePyCrud! Whether you're fixing bugs, adding new features, or improving documentation, your help is valuable. Please refer to the [CONTRIBUTING.md](docs/CONTRIBUTING.md) file for guidelines on how to contribute.
@@ -58,8 +65,11 @@ Below are useful references to help you understand and work with SharePyCrud:
 1. [Microsoft Graph API Documentation](https://learn.microsoft.com/en-us/graph/)
 2. [SharePoint REST API Documentation](https://learn.microsoft.com/en-us/sharepoint/dev/sp-add-ins/get-to-know-the-sharepoint-rest-service)
 3. [Python Requests Library](https://docs.python-requests.org/en/latest/)
+4. [Singleton Pattern in Python – A Complete Guide](https://www.geeksforgeeks.org/singleton-pattern-in-python-a-complete-guide/)
+5. [The Singleton Pattern](https://python-patterns.guide/gang-of-four/singleton/)
+6. [Python Logging Tutorial](https://docs.python.org/3/howto/logging.html)
 
-These resources will provide background on the APIs and libraries used in this project.
+These resources will provide background on the APIs, libraries and design patterns used in this project.
 
 ---
 
