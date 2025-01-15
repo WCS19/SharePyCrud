@@ -1,85 +1,108 @@
 import pytest
-from sharepycrud.config import SharePointConfig
+from unittest.mock import patch, MagicMock
+from typing import Any, List, Tuple
 import os
-from unittest.mock import patch
+from sharepycrud.config import SharePointConfig
+from sharepycrud.logger import logger
 
 
 @pytest.fixture
-def config() -> SharePointConfig:
-    """Create a SharePointConfig instance with test values"""
+def valid_config() -> SharePointConfig:
+    """
+    Returns a valid SharePointConfig instance for testing.
+    """
     return SharePointConfig(
-        tenant_id="test-tenant",
-        client_id="test-client",
-        client_secret="test-secret",
+        tenant_id="test-tenant-id",
+        client_id="test-client-id",
+        client_secret="test-client-secret",
         sharepoint_url="https://test.sharepoint.com",
     )
 
 
-def test_config_initialization(config: SharePointConfig) -> None:
-    """Test SharePointConfig initialization with all fields"""
-    assert config.tenant_id == "test-tenant"
-    assert config.client_id == "test-client"
-    assert config.client_secret == "test-secret"
-    assert config.sharepoint_url == "https://test.sharepoint.com"
-    assert config.resource_url == "https://graph.microsoft.com/"
+def test_validate_success(valid_config: SharePointConfig, caplog: Any) -> None:
+    """
+    Test that validate returns True when all fields are provided.
+    """
+    caplog.set_level("DEBUG")
+    is_valid, missing_fields = valid_config.validate()
+    assert is_valid, "Expected validation to succeed."
+    assert missing_fields == [], "Expected no missing fields."
+    assert "Configuration validated successfully" in caplog.text
 
 
-def test_config_validation_success(config: SharePointConfig) -> None:
-    """Test validation with all required fields"""
-    is_valid, missing_fields = config.validate()
-    assert is_valid is True
-    assert len(missing_fields) == 0
+def test_validate_missing_fields(caplog: Any) -> None:
+    """
+    Test that validate raises ValueError and logs missing fields when some fields are missing.
+    """
+    caplog.set_level("DEBUG")
 
-
-def test_config_validation_failure() -> None:
-    """Test validation with missing fields"""
     config = SharePointConfig(
-        tenant_id="", client_id="test-client", client_secret="", sharepoint_url=""
+        tenant_id="",
+        client_id="test-client-id",
+        client_secret="",
+        sharepoint_url="https://test.sharepoint.com",
     )
-    is_valid, missing_fields = config.validate()
-    assert is_valid is False
-    assert set(missing_fields) == {"TENANT_ID", "CLIENT_SECRET", "SHAREPOINT_URL"}
+
+    with pytest.raises(
+        ValueError,
+        match="Configuration validation failed. Missing fields: TENANT_ID, CLIENT_SECRET",
+    ):
+        config.validate()
+
+    assert (
+        "Configuration validation failed. Missing fields: TENANT_ID, CLIENT_SECRET"
+        in caplog.text
+    )
 
 
-def test_config_from_env() -> None:
-    """Test creating config from environment variables"""
-    env_vars = {
-        "TENANT_ID": "env-tenant",
-        "CLIENT_ID": "env-client",
-        "CLIENT_SECRET": "env-secret",
-        "SHAREPOINT_URL": "https://env.sharepoint.com",
-    }
+def test_from_env(monkeypatch: Any) -> None:
+    """
+    Test that from_env correctly loads configuration from environment variables.
+    """
+    monkeypatch.setenv("TENANT_ID", "test-tenant-id")
+    monkeypatch.setenv("CLIENT_ID", "test-client-id")
+    monkeypatch.setenv("CLIENT_SECRET", "test-client-secret")
+    monkeypatch.setenv("SHAREPOINT_URL", "https://test.sharepoint.com")
 
-    with (
-        patch.dict(os.environ, env_vars),
-        patch("sharepycrud.config.load_dotenv"),
-    ):  # Mock load_dotenv
+    config = SharePointConfig.from_env()
+
+    assert config.tenant_id == "test-tenant-id"
+    assert config.client_id == "test-client-id"
+    assert config.client_secret == "test-client-secret"
+    assert config.sharepoint_url == "https://test.sharepoint.com"
+
+
+def test_from_env_missing_fields(monkeypatch: Any) -> None:
+    """
+    Test that from_env returns empty strings for missing environment variables.
+    """
+    # Mock os.getenv to always return None for all environment variable lookups
+    with patch("os.getenv", side_effect=lambda key, default="": default):
         config = SharePointConfig.from_env()
 
-        assert config.tenant_id == "env-tenant"
-        assert config.client_id == "env-client"
-        assert config.client_secret == "env-secret"
-        assert config.sharepoint_url == "https://env.sharepoint.com"
+    assert config.tenant_id == ""
+    assert config.client_id == ""
+    assert config.client_secret == ""
+    assert config.sharepoint_url == ""
 
 
-def test_config_from_env_missing_vars() -> None:
-    """Test creating config from environment with missing variables"""
-    with (
-        patch.dict(os.environ, {}, clear=True),
-        patch("sharepycrud.config.load_dotenv"),
-    ):  # Mock load_dotenv
-        config = SharePointConfig.from_env()
+def test_validate_logging_for_missing_fields(caplog: Any) -> None:
+    """
+    Test that validate logs missing fields at DEBUG level when validation fails.
+    """
+    caplog.set_level("DEBUG")
 
-        assert config.tenant_id == ""
-        assert config.client_id == ""
-        assert config.client_secret == ""
-        assert config.sharepoint_url == ""
+    config = SharePointConfig(
+        tenant_id="",
+        client_id="",
+        client_secret="",
+        sharepoint_url="",
+    )
 
-        is_valid, missing_fields = config.validate()
-        assert is_valid is False
-        assert set(missing_fields) == {
-            "TENANT_ID",
-            "CLIENT_ID",
-            "CLIENT_SECRET",
-            "SHAREPOINT_URL",
-        }
+    with pytest.raises(ValueError):
+        config.validate()
+
+    assert (
+        "Configuration validation failed. Missing fields: TENANT_ID, CLIENT_ID, CLIENT_SECRET, SHAREPOINT_URL"
+        in caplog.text
+    )
