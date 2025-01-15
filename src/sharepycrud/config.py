@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple, List
 import os
 from dotenv import load_dotenv
+from sharepycrud.logger import logger
 
 
 @dataclass
@@ -25,12 +26,16 @@ class SharePointConfig:
             field_name for field_name, value in required_fields.items() if not value
         ]
 
-        if len(missing_fields) == 0:
-            print("✓ Configuration validated successfully")
-        else:
-            print("⚠ Configuration validation failed")
+        if missing_fields:
+            logger.debug(
+                f"Configuration validation failed. Missing fields: {', '.join(missing_fields)}"
+            )
+            raise ValueError(
+                f"Configuration validation failed. Missing fields: {', '.join(missing_fields)}"
+            )
 
-        return (len(missing_fields) == 0, missing_fields)
+        logger.debug("Configuration validated successfully")
+        return True, missing_fields
 
     @classmethod
     def from_env(cls) -> "SharePointConfig":

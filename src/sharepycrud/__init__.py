@@ -9,17 +9,17 @@
 
 __version__ = "0.2.0.dev1"
 
-from .auth import SharePointAuth
 from .config import SharePointConfig
 from .baseClient import BaseClient
 from .createClient import CreateClient
 from .readClient import ReadClient
+from .logger import setup_logging, get_logger
 
 __all__ = [
-    "SharePointAuth",
     "SharePointConfig",
     "BaseClient",
     "CreateClient",
     "ReadClient",
-    "SharePointClient",
+    "setup_logging",
+    "get_logger",
 ]
