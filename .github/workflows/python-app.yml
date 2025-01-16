@@ -53,16 +53,16 @@ jobs:
         SHAREPOINT_URL: "https://example.sharepoint.com"
       run: echo "Environment variables set"
 
-    - name: Test with pytest
+    - name: Test with pytest and coverage
       run: |
-        mkdir -p test-results
-        python -m pytest -s tests --junitxml=test-results/junit.xml --html=test-results/report.html --self-contained-html
-
-    - name: Generate coverage report
-      run: |
-        mkdir -p coverage-results
-        python -m pytest --cov=src --cov-report=html --cov-report=xml tests/
-        mv htmlcov/* coverage-results/
+        mkdir -p test-results coverage-results
+        python -m pytest tests/ \
+          --cov=src/sharepycrud \
+          --cov-report=xml:coverage-results/coverage.xml \
+          --cov-report=html:coverage-results/htmlcov \
+          --junitxml=test-results/junit.xml \
+          --html=test-results/report.html \
+          --self-contained-html
 
     - name: Upload coverage results
       if: always()
@@ -81,7 +81,7 @@ jobs:
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       with:
-        token: ${{ secrets.CODECOV_TOKEN }} # Add your Codecov token in GitHub secrets
+        token: ${{ secrets.CODECOV_TOKEN }}
         files: ./coverage-results/coverage.xml
         flags: unittests
         name: codecov-coverage-report
