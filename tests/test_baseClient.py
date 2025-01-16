@@ -361,19 +361,24 @@ def test_parse_folder_path_valid(base_client: BaseClient, caplog: Any) -> None:
     assert f"Parsed folder path '{folder_path}' into: {components}" in caplog.text
 
 
+def test_parse_folder_path_empty_input(base_client: BaseClient) -> None:
+    """Test parse_folder_path with empty input."""
+    result = base_client.parse_folder_path("")
+    assert result == [""]
+
+
 def test_parse_folder_path_exception(base_client: BaseClient, caplog: Any) -> None:
     """
     Test that parse_folder_path raises an exception if the input is None.
     """
     caplog.set_level(logging.DEBUG)
 
-    # Pass in None so calling .strip("/") raises an AttributeError
-    folder_path = None
+    folder_path: Optional[str] = None
 
     with pytest.raises(
         AttributeError, match="'NoneType' object has no attribute 'strip'"
     ):
-        base_client.parse_folder_path(folder_path)
+        base_client.parse_folder_path(cast(str, folder_path))
 
     assert (
         "Error parsing folder path: 'NoneType' object has no attribute 'strip'"
