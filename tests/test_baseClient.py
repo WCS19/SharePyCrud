@@ -225,10 +225,8 @@ def test_make_graph_request_with_custom_headers(base_client: BaseClient) -> None
             headers=custom_headers,
         )
 
-        # Verify the response
         assert response == {"result": "ok"}
 
-        # Check the method, headers, and URL in the mock call
         call_args: tuple[str, str] = mock_request.call_args.args  # Positional arguments
         call_kwargs: Dict[str, Any] = mock_request.call_args.kwargs  # Keyword arguments
 

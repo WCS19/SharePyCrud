@@ -58,42 +58,6 @@ class BaseClient:
             logger.error(f"Failed to get access token: {str(e)}")
             raise ValueError("Failed to obtain access token")
 
-    #  def _get_access_token(self) -> Optional[str]:
-    #     """
-    #     Retrieve an access token using Azure AD client credentials flow.
-    #     """
-    #     url = f"https://login.microsoftonline.com/{self.config.tenant_id}/oauth2/v2.0/token"
-    #     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    #     body = {
-    #         "grant_type": "client_credentials",
-    #         "client_id": self.config.client_id,
-    #         "client_secret": self.config.client_secret,
-    #         "scope": "https://graph.microsoft.com/.default",
-    #     }
-
-    #     try:
-    #         # Make a direct requests.post call without depending on self.access_token
-    #         response = requests.post(url, headers=headers, data=body)
-    #         response.raise_for_status()
-    #         token = cast(Optional[str], response.json().get("access_token"))
-
-    #         if token:
-    #             logger.debug("Successfully obtained access token")
-    #             return token
-
-    #         logger.error("No access token in response")
-    #         return None
-
-    #     except requests.exceptions.HTTPError as e:
-    #         logger.error(
-    #             f"HTTP error getting access token: {e.response.status_code} - {e.response.reason}"
-    #         )
-    #         logger.debug(f"Response content: {e.response.text}")
-    #         return None
-    #     except requests.exceptions.RequestException as e:
-    #         logger.error(f"Failed to get access token: {str(e)}")
-    #         return None
-
     def make_graph_request(
         self,
         url: str,
@@ -164,74 +128,6 @@ class BaseClient:
             logger.error(f"Request failed: {str(e)}")
             logger.debug(f"Failed URL: {url}")
             raise
-
-    # def make_graph_request(
-    #     self,
-    #     url: str,
-    #     method: str = "GET",
-    #     data: Optional[Union[Dict[str, Any], bytes]] = None,  # Allow Dict or bytes
-    #     headers: Optional[Dict[str, str]] = None,
-    # ) -> Dict[str, Any]:
-    #     """
-    #     Generic function to make Microsoft Graph API requests.
-
-    #     Args:
-    #         url: URL of the API request.
-    #         method: HTTP method to use (default is GET).
-    #         data: Data to send with the request (can be dict or bytes).
-    #         headers: Optional headers to include in the request.
-
-    #     Returns:
-    #         The response from the API request as a dictionary.
-
-    #     Raises:
-    #         ValueError: If access token is missing or invalid
-    #         requests.exceptions.RequestException: For any request-related errors
-    #     """
-    #     if not self.access_token:
-    #         logger.error("Access token is missing or invalid")
-    #         raise ValueError("Access token is missing or invalid")
-
-    #     default_headers = {
-    #         "Authorization": f"Bearer {self.access_token}",
-    #         "Accept": "application/json",
-    #     }
-
-    #     if headers:
-    #         default_headers.update(headers)
-
-    #     try:
-    #         logger.debug(f"Making {method} request to {url}")
-    #         response = requests.request(
-    #             method,
-    #             url,
-    #             headers=default_headers,
-    #             json=data if isinstance(data, dict) else None,
-    #             data=data if isinstance(data, bytes) else None,
-    #         )
-    #         response.raise_for_status()
-
-    #         # For non-JSON responses, just return an empty dict
-    #         if not response.headers.get("Content-Type", "").startswith(
-    #             "application/json"
-    #         ):
-    #             return {}
-
-    #         result = cast(Dict[str, Any], response.json())
-    #         logger.debug(f"Request successful: {method} {url}")
-    #         return result
-
-    #     except requests.exceptions.HTTPError as e:
-    #         logger.error(
-    #             f"HTTP error in request: {e.response.status_code} - {e.response.reason}"
-    #         )
-    #         logger.debug(f"Failed URL: {url}")
-    #         logger.debug(f"Response content: {e.response.text}")
-    #         raise
-    #     except requests.exceptions.RequestException as e:
-    #         logger.error(f"Request failed: {str(e)}")
-    #         logger.debug(f"Failed URL: {url}")
-    #         raise
 
     def format_graph_url(self, base_path: str, *args: str) -> str:
         """

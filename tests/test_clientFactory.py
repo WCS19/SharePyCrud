@@ -51,8 +51,6 @@ def test_get_base_client_error(mock_config: SharePointConfig, caplog: Any) -> No
     ):
         with pytest.raises(Exception, match="Initialization error"):
             ClientFactory.get_base_client(mock_config)
-
-    # Check that we logged the error
     assert "Failed to create BaseClient: Initialization error" in caplog.text
 
 
