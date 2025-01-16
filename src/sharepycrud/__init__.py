@@ -7,7 +7,7 @@
 
 """SharePyCrud: A Python library for SharePoint CRUD operations."""
 
-__version__ = "0.2.0.dev1"
+__version__ = "0.2.1.dev1"
 
 from .config import SharePointConfig
 from .baseClient import BaseClient
