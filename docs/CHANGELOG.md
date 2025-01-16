@@ -58,7 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized logging patterns across all client classes.
 - Improved error message clarity for business users.
 
+## [0.2.1.dev2] - 2025-01-16
 
+### Fixed
+- Fixed issue where ClientFactory was not exposed in the package root.
 
 ### Dependencies
 - Python 3.11+ requirement
