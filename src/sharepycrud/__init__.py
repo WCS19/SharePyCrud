@@ -10,6 +10,7 @@
 __version__ = "0.2.1.dev1"
 
 from .config import SharePointConfig
+from .clientFactory import ClientFactory
 from .baseClient import BaseClient
 from .createClient import CreateClient
 from .readClient import ReadClient
@@ -17,6 +18,7 @@ from .logger import setup_logging, get_logger
 
 __all__ = [
     "SharePointConfig",
+    "ClientFactory",
     "BaseClient",
     "CreateClient",
     "ReadClient",
