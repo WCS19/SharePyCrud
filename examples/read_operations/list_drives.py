@@ -18,9 +18,16 @@ def main() -> None:
     print(f"\nSite ID: {site_id}")
 
     # List drives and root contents
-    drives = read_client.list_drives(site_id)
-    if not drives:
+    # This function is recursive and returns a lot of information.
+    # It indexes the folders and files in the drive and if the drive is large, it can take a long time to return.
+    # drives = read_client.list_drives_and_root_contents(site_id)
+    # if not drives:
+    #     print("No drives found")
+
+    drive_names = read_client.list_drive_names(site_id)
+    if not drive_names:
         print("No drives found")
+        return
 
     drive_name = "Documents"
     drive_id = read_client.get_drive_id(site_id, drive_name)
@@ -29,10 +36,8 @@ def main() -> None:
         return
 
     parent_folders = read_client.list_parent_folders(drive_id=drive_id)
-    print(f"\nParent folders: {parent_folders}")
-    if parent_folders is not None:
-        for folder in parent_folders:
-            print(f"Folder: {folder['name']} (ID: {folder['path']})")
+    if parent_folders is None:
+        return
 
 
 if __name__ == "__main__":
