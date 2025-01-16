@@ -73,44 +73,13 @@ class ReadClient:
         url = self.client.format_graph_url("sites")
         response = self.client.make_graph_request(url)
 
-        if response is None:  # Request failed
-            logger.error("Failed to retrieve sites")
+        if response is None:
             return None
 
         site_names = [site.get("name") for site in response.get("value", [])]
-        if not site_names:  # No sites found
-            logger.info("No sites found")
-        else:
-            logger.info(f"Found {len(site_names)} sites")
-
+        logger.info(f"Found {len(site_names)} sites")
+        logger.info(f"Site names: {site_names}")
         return site_names
-
-    # def list_sites(self) -> Optional[List[Optional[str]]]:
-    #     """List all sites
-
-    #     Args:
-    #         None
-
-    #     Returns:
-    #         List of site names, or None if request fails.
-    #         Individual site names can be None if they don't have a name.
-    #     """
-    #     if not self.client.access_token:
-    #         return None
-    #     url = self.client.format_graph_url("sites")
-    #     response = self.client.make_graph_request(url)
-
-    #     # Extract site names, allowing for None values
-    #     site_names = (
-    #         [site.get("name") for site in response.get("value", [])]
-    #         if response
-    #         else None
-    #     )
-    #     if not site_names:
-    #         logger.info("No sites found")
-    #     else:
-    #         logger.info(f"Found {len(site_names)} sites")
-    #     return site_names
 
     def get_site_id(
         self, site_name: str, sharepoint_url: Optional[str] = None
@@ -134,21 +103,41 @@ class ReadClient:
         base_url = sharepoint_url or self.client.config.sharepoint_url
         url = self.client.format_graph_url(f"sites/{base_url}:/sites/{site_name}")
 
-        try:
-            response = self.client.make_graph_request(url)
-            site_id = response.get("id")
-
-            if isinstance(site_id, str):
-                logger.info(f"Found site: {site_name}")
-                logger.info(f"Site ID: {site_id}")
-                return site_id
-
+        response = self.client.make_graph_request(url)
+        if not response:
             return None
 
-        except (requests.exceptions.RequestException, ValueError):
+        site_id = response.get("id")
+        if isinstance(site_id, str):
+            logger.info(f"Found site: {site_name}")
+            logger.info(f"Site ID: {site_id}")
+            return site_id
+
+        return None
+
+    def list_drive_names(self, site_id: str) -> Optional[List[str]]:
+        """List all drive names for a site.
+
+        Args:
+            site_id: ID of the SharePoint site
+
+        Returns:
+            List of drive names, or None if request fails
+        """
+        if not self.client.access_token:
             return None
 
-    def list_drives(self, site_id: str) -> Optional[Dict[str, Any]]:
+        url = self.client.format_graph_url("sites", site_id, "drives")
+        response = self.client.make_graph_request(url)
+        if not response:
+            return None
+
+        drive_names = [drive.get("name") for drive in response.get("value", [])]
+        logger.info(f"Found {len(drive_names)} drives")
+        logger.info(f"Drive names: {drive_names}")
+        return drive_names
+
+    def list_drives_and_root_contents(self, site_id: str) -> Optional[Dict[str, Any]]:
         """List all drives and their root contents.
 
         Args:
@@ -158,35 +147,33 @@ class ReadClient:
             Dictionary of drives and their root contents, or None if request fails.
         """
         if not self.client.access_token:
-            logger.error("Access token is missing or invalid")
             return None
 
         url = self.client.format_graph_url("sites", site_id, "drives")
         response = self.client.make_graph_request(url)
 
-        if response and "value" in response:
-            logger.info("=== Drives ===")
-            for drive in response["value"]:
-                logger.info(f"Drive: {drive['name']}, ID: {drive['id']}")
+        if not response:
+            return None
 
-                # Get root folder contents
-                root_url = self.client.format_graph_url(
-                    "drives", drive["id"], "root", "children"
+        logger.info(f"Found {len(response.get('value', []))} drives")
+
+        for drive in response.get("value", []):
+            logger.info(f"Processing drive: {drive['name']}")
+
+            root_url = self.client.format_graph_url(
+                "drives", drive["id"], "root", "children"
+            )
+            root_contents = self.client.make_graph_request(root_url)
+
+            if root_contents:
+                items = root_contents.get("value", [])
+                folders = sum(1 for item in items if "folder" in item)
+                files = len(items) - folders
+                logger.info(
+                    f"Drive '{drive['name']}' contains {folders} folders and {files} files"
                 )
-                root_contents = self.client.make_graph_request(root_url)
 
-                if root_contents and "value" in root_contents:
-                    logger.info("Root contents:")
-                    for item in root_contents["value"]:
-                        item_type = "folder" if "folder" in item else "file"
-                        logger.info(f"- {item['name']} ({item_type})")
-                else:
-                    logger.info("No items in root folder")
-
-            return response
-
-        logger.error("Failed to list drives")
-        return None
+        return response
 
     def get_drive_id(self, site_id: str, drive_name: str) -> Optional[str]:
         """Get drive ID by its name.
@@ -200,21 +187,22 @@ class ReadClient:
         """
         if not self.client.access_token:
             return None
+
         url = self.client.format_graph_url("sites", site_id, "drives")
         response = self.client.make_graph_request(url)
 
-        if not response or "value" not in response:
-            logger.error("Failed to list drives")
+        if not response:
             return None
 
-        drives: List[Dict[str, Any]] = response["value"]
+        drives: List[Dict[str, Any]] = response.get("value", [])
         for drive in drives:
             if isinstance(drive, dict) and drive.get("name") == drive_name:
                 drive_id = drive.get("id")
                 if isinstance(drive_id, str):
-                    logger.info(f"Found drive: {drive_name}")
+                    logger.info(f"Found drive: {drive_name}, ID: {drive_id}")
                     return drive_id
 
+        logger.info(f"Drive not found: {drive_name}")
         return None
 
     def list_drive_ids(self, site_id: str) -> List[Tuple[str, str]]:
@@ -256,24 +244,24 @@ class ReadClient:
         response = self.client.make_graph_request(url)
 
         folders: List[Dict[str, Any]] = []
-        if not response or "value" not in response:
-            logger.error("Failed to list folder contents")
+        if not response:
             return folders
 
-        for item in response["value"]:
+        for item in response.get("value", []):
             if "folder" in item:
                 folder_name = item["name"]
                 folder_id = item["id"]
                 folder_path = item["parentReference"]["path"] + f"/{folder_name}"
 
-                logger.info(f"{'  ' * level}- Folder: {folder_name} (ID: {folder_id})")
+                logger.info(f"Processing folder: {folder_name} at level {level}")
                 folders.append(
                     {"name": folder_name, "id": folder_id, "path": folder_path}
                 )
 
                 subfolders = self.list_all_folders(drive_id, folder_id, level + 1)
                 folders.extend(subfolders)
-                logger.info(f"Found {len(subfolders)} subfolders")
+                if subfolders:
+                    logger.info(f"Found {len(subfolders)} subfolders in {folder_name}")
 
         return folders
 
@@ -290,79 +278,21 @@ class ReadClient:
             return None
 
         url = self.client.format_graph_url("drives", drive_id, "root/children")
+        response = self.client.make_graph_request(url)
 
-        try:
-            response = self.client.make_graph_request(url)
-        except Exception as e:
-            logger.error(f"An unexpected error occurred: {str(e)}")
+        if not response:
             return None
 
-        # Ensure response is a dictionary
-        if not isinstance(response, dict):
-            logger.error("Unexpected response format")
-            return None
-
-        # Check if the response contains an error
-        if "error" in response:
-            logger.error(
-                f"Error getting folder contents: {response['error'].get('code')}"
-            )
-            logger.error(f"Message: {response['error'].get('message')}")
-            return None
-
-        items = response.get("value", [])
         parent_folders = []
-
-        for item in items:
+        for item in response.get("value", []):
             if "folder" in item:
                 folder_name = item["name"]
-                folder_id = item["id"]
                 folder_path = item["parentReference"]["path"] + f"/{folder_name}"
                 parent_folders.append({"name": folder_name, "path": folder_path})
                 logger.info(f"Found parent folder: {folder_name}")
 
+        logger.info(f"Found {len(parent_folders)} parent folders")
         return parent_folders
-
-    # def list_parent_folders(self, drive_id: str) -> Optional[List[Dict[str, Any]]]:
-    #     """List only top-level (parent) folders within a drive.
-
-    #     Args:
-    #         drive_id: ID of the drive to search in.
-
-    #     Returns:
-    #         A list of parent folders, or None if the request fails.
-    #     """
-    #     if not self.client.access_token:
-    #         return None
-
-    #     url = self.client.format_graph_url("drives", drive_id, "root/children")
-    #     response = self.client.make_graph_request(url)
-
-    #     # Ensure response is a dictionary
-    #     if not isinstance(response, dict):
-    #         logger.error("Unexpected response format")
-    #         return None
-
-    #     # Check if the response contains an error
-    #     if "error" in response:
-    #         logger.error(
-    #             f"Error getting folder contents: {response['error'].get('code')}"
-    #         )
-    #         logger.error("Message:", response["error"].get("message"))
-    #         return None
-
-    #     items = response.get("value", [])
-    #     parent_folders = []
-
-    #     for item in items:
-    #         if "folder" in item:
-    #             folder_name = item["name"]
-    #             folder_id = item["id"]
-    #             folder_path = item["parentReference"]["path"] + f"/{folder_name}"
-    #             parent_folders.append({"name": folder_name, "path": folder_path})
-    #             logger.info(f"Found parent folder: {folder_name}")
-
-    #     return parent_folders
 
     def get_root_folder_id_by_name(
         self, drive_id: str, folder_name: str
@@ -411,7 +341,6 @@ class ReadClient:
         response = self.client.make_graph_request(url)
 
         if not response:
-            logger.error("Failed to get folder contents")
             return None
 
         folder_contents: List[Dict[str, Any]] = []
@@ -426,7 +355,10 @@ class ReadClient:
                 }
             )
 
-        logger.info(f"Found {len(folder_contents)} items in folder")
+        folders = sum(1 for item in folder_contents if item["type"] == "folder")
+        files = len(folder_contents) - folders
+        logger.info(f"Found {folders} folders and {files} files")
+
         return folder_contents
 
     def get_nested_folder_info(
@@ -455,32 +387,27 @@ class ReadClient:
             )
             response = self.client.make_graph_request(url)
 
-            if "value" in response:
-                folders = [
-                    item
-                    for item in response["value"]
-                    if item["name"] == folder_name and "folder" in item
-                ]
-                if (
-                    folders
-                    and isinstance(folders[0]["id"], str)
-                    and isinstance(folders[0]["name"], str)
-                ):
-                    current_parent_id = folders[0]["id"]
-                    deepest_folder_name = folders[0]["name"]
-                else:
-                    logger.error(
-                        f"Folder '{folder_name}' not found in path '{folder_path}'."
-                    )
-                    return None
+            if not response:
+                return None
+
+            folders = [
+                item
+                for item in response.get("value", [])
+                if item["name"] == folder_name and "folder" in item
+            ]
+
+            if folders:
+                current_parent_id = folders[0]["id"]
+                deepest_folder_name = folders[0]["name"]
+                logger.info(f"Processing folder: {folder_name}")
             else:
-                logger.error(f"Error validating folder path. Response: {response}")
+                logger.info(f"Folder not found: {folder_name}")
                 return None
 
         if deepest_folder_name is None:
-            logger.error(f"No folder found in path '{folder_path}'.")
             return None
-        logger.info(f"Found folder: {deepest_folder_name}, ID: {current_parent_id}")
+
+        logger.info(f"Found deepest folder: {deepest_folder_name}")
         return {"id": current_parent_id, "name": deepest_folder_name}
 
     def file_exists_in_folder(
@@ -505,14 +432,15 @@ class ReadClient:
         )
         response = self.client.make_graph_request(url)
 
-        if "value" in response:
-            # Look for a file with the same name
-            for item in response["value"]:
-                if item.get("name") == file_name and "file" in item:
-                    logger.info(f"File '{file_name}' exists in folder '{folder_id}'")
-                    return True
-        else:
-            logger.error(f"Error checking file existence. Response: {response}")
+        if not response:
+            return False
+
+        for item in response.get("value", []):
+            if item.get("name") == file_name and "file" in item:
+                logger.info(f"Found file: {file_name}")
+                return True
+
+        logger.info(f"File not found: {file_name}")
         return False
 
     def download_file(
@@ -533,31 +461,29 @@ class ReadClient:
 
         site_id = self.get_site_id(site_name=site_name)
         if not site_id:
-            logger.error("Failed to get site ID")
+            logger.info(f"Site not found: {site_name}")
             return None
 
         drive_id = self.get_drive_id(site_id, drive_name) if drive_name else None
         if not drive_id:
-            logger.error(f"Drive '{drive_name}' not found")
+            logger.info(f"Drive not found: {drive_name}")
             return None
 
         url = self.client.format_graph_url("drives", drive_id, "root/children")
-
-        # Get the file ID
         list_response = self.client.make_graph_request(url)
-        if not list_response or "value" not in list_response:
-            logger.error("Failed to list drive contents")
+
+        if not list_response:
             return None
 
         file_id = None
-        for item in list_response["value"]:
+        for item in list_response.get("value", []):
             if item.get("name") == file_path:
                 file_id = item.get("id")
                 logger.info(f"Found file: {file_path}")
                 break
 
         if not file_id:
-            logger.error(f"File '{file_path}' not found in drive")
+            logger.info(f"File not found: {file_path}")
             return None
 
         download_url = self.client.format_graph_url(
@@ -571,7 +497,6 @@ class ReadClient:
         if download_response.status_code == 200:
             logger.info(f"Successfully downloaded: {file_path}")
             return download_response.content
-        logger.error(
-            f"Error downloading file. Status code: {download_response.status_code}"
-        )
+
+        logger.info(f"Failed to download: {file_path}")
         return None

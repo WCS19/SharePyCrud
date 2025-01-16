@@ -67,13 +67,9 @@ class CreateClient:
         Returns:
             The ID of the created folder, or None if the request fails.
         """
-        # Log the intent at the business logic level
-        logger.info(
-            f"Attempting to create folder '{folder_name}' in drive '{drive_id}'."
-        )
+        logger.info(f"Creating folder: {folder_name}")
 
         if not self.client.access_token:
-            logger.error("Access token is missing. Cannot create folder.")
             return None
 
         url = self.client.format_graph_url("drives", drive_id, "root/children")
@@ -83,26 +79,18 @@ class CreateClient:
             "@microsoft.graph.conflictBehavior": "fail",
         }
 
-        try:
-            # BaseClient handles the low-level logging and HTTP details
-            response = self.client.make_graph_request(url, method="POST", data=data)
-            folder_id = response.get("id")
-
-            if isinstance(folder_id, str):
-                logger.info(
-                    f"Successfully created folder '{folder_name}' with ID '{folder_id}'."
-                )
-                return folder_id
-
-            logger.error("Error: Created folder ID is not a string.")
+        response = self.client.make_graph_request(url, method="POST", data=data)
+        if not response:
+            logger.info(f"Failed to create folder: {folder_name}")
             return None
 
-        except requests.exceptions.RequestException as e:
-            # Only log business-specific context here
-            logger.error(
-                f"Failed to create folder '{folder_name}' in drive '{drive_id}'."
-            )
-            return None
+        folder_id = response.get("id")
+        if isinstance(folder_id, str):
+            logger.info(f"Successfully created folder: {folder_name}")
+            return folder_id
+
+        logger.info(f"Failed to create folder: {folder_name}")
+        return None
 
     def create_file(
         self, drive_id: str, folder_id: str, file_name: str
@@ -115,6 +103,8 @@ class CreateClient:
         Returns:
             The ID of the created file, or None if the request fails.
         """
+        logger.info(f"Creating file: {file_name}")
+
         if not self.client.access_token:
             return None
 
@@ -127,19 +117,18 @@ class CreateClient:
             "@microsoft.graph.conflictBehavior": "fail",
         }
 
-        try:
-            response = self.client.make_graph_request(url, method="POST", data=data)
-            file_id = response.get("id")
-
-            if isinstance(file_id, str):
-                logger.info(f"Successfully created file: {file_name}")
-                return file_id
-
-            logger.error("Created file ID is not a string")
+        response = self.client.make_graph_request(url, method="POST", data=data)
+        if not response:
+            logger.info(f"Failed to create file: {file_name}")
             return None
 
-        except (requests.exceptions.RequestException, ValueError):
-            return None
+        file_id = response.get("id")
+        if isinstance(file_id, str):
+            logger.info(f"Successfully created file: {file_name}")
+            return file_id
+
+        logger.info(f"Failed to create file: {file_name}")
+        return None
 
     def upload_file_to_folder(
         self, drive_id: str, folder_id: str, file_name: str, file_path: str
@@ -153,37 +142,40 @@ class CreateClient:
         Returns:
             The ID of the uploaded file, or None if the request fails.
         """
+        logger.info(f"Uploading file: {file_name}")
+
         if not self.client.access_token:
             return None
 
         try:
             with open(file_path, "rb") as file:
                 file_content = file.read()
-
-            url = self.client.format_graph_url(
-                "drives", drive_id, "items", f"{folder_id}:/{file_name}:/content"
-            )
-
-            response = self.client.make_graph_request(
-                url,
-                method="PUT",
-                data=file_content,
-                headers={"Content-Type": "application/octet-stream"},
-            )
-
-            file_id = response.get("id")
-            if isinstance(file_id, str):
-                logger.info(f"Successfully uploaded file: {file_name}")
-                return file_id
-
-            logger.error("Uploaded file ID is not a string")
-            return None
-
         except FileNotFoundError:
-            logger.error(f"File not found: {file_path}")
+            logger.info(f"File not found: {file_name}")
             return None
-        except (requests.exceptions.RequestException, ValueError):
+
+        url = self.client.format_graph_url(
+            "drives", drive_id, "items", f"{folder_id}:/{file_name}:/content"
+        )
+
+        response = self.client.make_graph_request(
+            url,
+            method="PUT",
+            data=file_content,
+            headers={"Content-Type": "application/octet-stream"},
+        )
+
+        if not response:
+            logger.info(f"Failed to upload file: {file_name}")
             return None
+
+        file_id = response.get("id")
+        if isinstance(file_id, str):
+            logger.info(f"Successfully uploaded file: {file_name}")
+            return file_id
+
+        logger.info(f"Failed to upload file: {file_name}")
+        return None
 
     def create_list(
         self, site_id: str, list_name: str, list_template: str = "genericList"
@@ -196,6 +188,8 @@ class CreateClient:
         Returns:
             The ID of the created list, or None if the request fails.
         """
+        logger.info(f"Creating list: {list_name}")
+
         if not self.client.access_token:
             return None
 
@@ -207,19 +201,18 @@ class CreateClient:
             },
         }
 
-        try:
-            response = self.client.make_graph_request(url, method="POST", data=data)
-            list_id = response.get("id")
-
-            if isinstance(list_id, str):
-                logger.info(f"Successfully created list: {list_name}")
-                return list_id
-
-            logger.error("Created list ID is not a string")
+        response = self.client.make_graph_request(url, method="POST", data=data)
+        if not response:
+            logger.info(f"Failed to create list: {list_name}")
             return None
 
-        except (requests.exceptions.RequestException, ValueError):
-            return None
+        list_id = response.get("id")
+        if isinstance(list_id, str):
+            logger.info(f"Successfully created list: {list_name}")
+            return list_id
+
+        logger.info(f"Failed to create list: {list_name}")
+        return None
 
     def create_document_library(self, site_id: str, library_name: str) -> Optional[str]:
         """Create a document library in a SharePoint site.
@@ -229,7 +222,17 @@ class CreateClient:
         Returns:
             The ID of the created document library, or None if the request fails.
         """
+        logger.info(f"Creating document library: {library_name}")
+
         if not self.client.access_token:
             return None
 
-        return self.create_list(site_id, library_name, list_template="documentLibrary")
+        library_id = self.create_list(
+            site_id, library_name, list_template="documentLibrary"
+        )
+        if library_id:
+            logger.info(f"Successfully created document library: {library_name}")
+        else:
+            logger.info(f"Failed to create document library: {library_name}")
+
+        return library_id
