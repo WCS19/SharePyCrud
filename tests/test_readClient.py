@@ -1,767 +1,1050 @@
 import pytest
-import requests
-from unittest.mock import patch, MagicMock
-from typing import Dict, Any, List, Tuple, Optional, cast
-from _pytest.capture import CaptureFixture
-
+from unittest.mock import MagicMock, patch
 from sharepycrud.readClient import ReadClient
+from sharepycrud.baseClient import BaseClient
 from sharepycrud.config import SharePointConfig
+from typing import Any, List, Dict, Optional
+import requests
+import logging
+import sys
 
 
 @pytest.fixture
-def mock_config() -> SharePointConfig:
-    """Fixture for a mock SharePointConfig."""
-    return SharePointConfig(
-        tenant_id="test-tenant-id",
-        client_id="test-client-id",
-        client_secret="test-client-secret",
-        sharepoint_url="test.sharepoint.com",
+def mock_base_client() -> BaseClient:
+    """Mocked BaseClient instance."""
+    base_client = MagicMock(spec=BaseClient)
+    base_client.access_token = "mock_access_token"
+    base_client.config = SharePointConfig(
+        tenant_id="mock-tenant-id",
+        client_id="mock-client-id",
+        client_secret="mock-client-secret",
+        sharepoint_url="https://mock.sharepoint.com",
+    )
+    return base_client
+
+
+@pytest.fixture
+def read_client(mock_base_client: BaseClient) -> ReadClient:
+    """ReadClient initialized with a mocked BaseClient."""
+    return ReadClient(mock_base_client)
+
+
+def test_make_graph_request(read_client: ReadClient) -> None:
+    """Test delegating make_graph_request to BaseClient."""
+    with patch.object(
+        read_client.client, "make_graph_request", return_value={"key": "value"}
+    ) as mock_method:
+        result = read_client.make_graph_request(
+            "https://mock-url.com", "POST", {"data": "test"}
+        )
+        mock_method.assert_called_once_with(
+            "https://mock-url.com", "POST", {"data": "test"}
+        )
+        assert result == {"key": "value"}
+
+
+def test_format_graph_url(read_client: ReadClient) -> None:
+    """Test delegating format_graph_url to BaseClient."""
+    with patch.object(
+        read_client.client, "format_graph_url", return_value="https://mocked-url.com"
+    ) as mock_method:
+        result = read_client.format_graph_url("sites", "mock-site")
+        mock_method.assert_called_once_with("sites", "mock-site")
+        assert result == "https://mocked-url.com"
+
+
+def test_parse_folder_path(read_client: ReadClient) -> None:
+    """Test delegating parse_folder_path to BaseClient."""
+    with patch.object(
+        read_client.client, "parse_folder_path", return_value=["Folder1", "Folder2"]
+    ) as mock_method:
+        result = read_client.parse_folder_path("/Folder1/Folder2/")
+        mock_method.assert_called_once_with("/Folder1/Folder2/")
+        assert result == ["Folder1", "Folder2"]
+
+
+def test_list_sites_success(read_client: ReadClient) -> None:
+    """Test listing sites successfully."""
+    mock_response = {"value": [{"name": "Site1"}, {"name": "Site2"}]}
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.list_sites()
+        assert result == ["Site1", "Site2"]
+
+
+def test_list_sites_no_sites_found(read_client: ReadClient, caplog: Any) -> None:
+    """
+    Test listing sites when no sites are found (empty response).
+    """
+    caplog.set_level("INFO", logger="sharepycrud.readClient")
+
+    with patch.object(
+        read_client.client, "make_graph_request", return_value={"value": []}
+    ):
+        result = read_client.list_sites()
+        assert result == []
+        assert "Found 0 sites" in caplog.text
+
+
+def test_list_sites_no_token(read_client: ReadClient) -> None:
+    """Test listing sites when access token is missing."""
+    read_client.client.access_token = None
+    result = read_client.list_sites()
+    assert result is None
+
+
+def test_list_sites_response_none(read_client: ReadClient) -> None:
+    """Test listing sites when response is None."""
+    with patch.object(read_client.client, "make_graph_request", return_value=None):
+        result = read_client.list_sites()
+        assert result is None
+
+
+def test_get_site_id_success(read_client: ReadClient, caplog: Any) -> None:
+    """Test getting a site ID successfully."""
+    caplog.set_level("INFO", logger="sharepycrud.readClient")
+    mock_response = {"id": "mock-site-id"}
+
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.get_site_id("mock-site-name")
+
+    assert result == "mock-site-id"
+    assert "Found site: mock-site-name" in caplog.text
+    assert "Site ID: mock-site-id" in caplog.text
+
+
+def test_get_site_id_no_access_token(read_client: ReadClient) -> None:
+    """Test that get_site_id returns None when there is no access token."""
+    read_client.client.access_token = None
+    result = read_client.get_site_id(site_name="TestSite")
+    assert result is None
+
+
+def test_get_site_id_no_site_name(read_client: ReadClient, caplog: Any) -> None:
+    """Test that get_site_id logs an error and returns None when site_name is empty."""
+    caplog.set_level("ERROR", logger="sharepycrud.readClient")
+    result = read_client.get_site_id(site_name="")
+    assert result is None
+    assert "Site name is required" in caplog.text
+
+
+def test_get_site_id_not_found(read_client: ReadClient) -> None:
+    """Test that get_site_id returns None when the site ID is not found."""
+    mock_response = {"id": None}  # Site ID is not present
+
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.get_site_id(site_name="TestSite")
+
+    assert result is None
+
+
+def test_get_site_id_no_response(read_client: ReadClient) -> None:
+    """Test that get_site_id returns None when make_graph_request returns None."""
+    with patch.object(read_client.client, "make_graph_request", return_value=None):
+        result = read_client.get_site_id(site_name="TestSite")
+
+    assert result is None
+
+
+def test_list_drives_and_root_contents_success(
+    read_client: ReadClient, caplog: Any
+) -> None:
+    """Test listing drives and root contents successfully."""
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    mock_response: Dict[str, List[Dict[str, str]]] = {
+        "value": [{"name": "Drive1", "id": "drive-id-1"}]
+    }
+    mock_root_contents: Dict[str, List[Dict[str, Any]]] = {
+        "value": [
+            {"name": "Folder1", "folder": {}},
+            {"name": "File1", "file": {}},
+        ]
+    }
+
+    with patch.object(
+        read_client.client,
+        "make_graph_request",
+        side_effect=[mock_response, mock_root_contents],
+    ):
+        result = read_client.list_drives_and_root_contents("site123")
+        assert result == mock_response
+        assert "Found 1 drives" in caplog.text
+        assert "Processing drive: Drive1" in caplog.text
+        assert "Drive 'Drive1' contains 1 folders and 1 files" in caplog.text
+
+
+def test_list_drives_and_root_contents_no_access_token(read_client: ReadClient) -> None:
+    """Test that list_drives_and_root_contents returns None when there is no access token."""
+    read_client.client.access_token = None
+    result = read_client.list_drives_and_root_contents(site_id="mock-site-id")
+    assert result is None
+
+
+def test_list_drives_and_root_contents_empty_response(
+    read_client: ReadClient, caplog: Any
+) -> None:
+    """Test listing drives and root contents when no drives are present."""
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    mock_response: Dict[str, List[Any]] = {"value": []}
+
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.list_drives_and_root_contents(site_id="mock-site-id")
+        assert result == {"value": []}
+        assert "Found 0 drives" in caplog.text
+
+
+def test_list_drives_and_root_contents_no_contents(
+    read_client: ReadClient, caplog: Any
+) -> None:
+    """Test listing drives and root contents when root folders are empty."""
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    mock_drive_response: Dict[str, List[Dict[str, str]]] = {
+        "value": [{"name": "Drive1", "id": "drive1"}]
+    }
+    mock_empty_contents: Dict[str, List[Any]] = {"value": []}
+
+    with patch.object(
+        read_client.client,
+        "make_graph_request",
+        side_effect=[mock_drive_response, mock_empty_contents],
+    ):
+        result = read_client.list_drives_and_root_contents("site123")
+        assert result == mock_drive_response
+        assert "Found 1 drives" in caplog.text
+        assert "Processing drive: Drive1" in caplog.text
+        assert "Drive 'Drive1' contains 0 folders and 0 files" in caplog.text
+
+
+def test_list_drives_and_root_contents_with_items(
+    read_client: ReadClient, caplog: Any
+) -> None:
+    """Test listing drives and root contents with items."""
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    mock_response: Dict[str, List[Dict[str, str]]] = {
+        "value": [
+            {"id": "drive1", "name": "Drive1"},
+        ]
+    }
+    mock_root_contents: Dict[str, List[Dict[str, Any]]] = {
+        "value": [
+            {"name": "Folder1", "folder": {}},
+            {"name": "File1", "file": {}},
+        ]
+    }
+
+    with patch.object(
+        read_client.client,
+        "make_graph_request",
+        side_effect=[mock_response, mock_root_contents],
+    ):
+        result = read_client.list_drives_and_root_contents("site123")
+        assert result == mock_response
+        assert "Found 1 drives" in caplog.text
+        assert "Processing drive: Drive1" in caplog.text
+        assert "Drive 'Drive1' contains 1 folders and 1 files" in caplog.text
+
+
+def test_list_drives_and_root_contents_no_items_in_root_folder(
+    read_client: ReadClient, caplog: Any
+) -> None:
+    """
+    Test listing drives and root contents where root folder contains no items.
+    """
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    mock_drive_response: Dict[str, List[Dict[str, str]]] = {
+        "value": [
+            {"id": "drive1", "name": "Drive1"},
+        ]
+    }
+    mock_empty_root_response: Dict[str, Any] = {"value": []}  # Empty root contents
+
+    with patch.object(
+        read_client.client,
+        "make_graph_request",
+        side_effect=[mock_drive_response, mock_empty_root_response],
+    ):
+        result = read_client.list_drives_and_root_contents("site123")
+        assert result == mock_drive_response
+        assert "Found 1 drives" in caplog.text
+        assert "Processing drive: Drive1" in caplog.text
+        assert "Drive 'Drive1' contains 0 folders and 0 files" in caplog.text
+
+
+def test_list_drives_and_root_contents_no_response(read_client: ReadClient) -> None:
+    """Test listing drives and root contents when make_graph_request returns None."""
+    with patch.object(read_client.client, "make_graph_request", return_value=None):
+        result = read_client.list_drives_and_root_contents("site123")
+        assert result is None
+
+
+def test_list_drive_names_success(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test successful listing of drive names."""
+    mock_base_client.make_graph_request.return_value = {
+        "value": [
+            {"name": "Documents"},
+            {"name": "Shared Documents"},
+            {"name": "Site Assets"},
+        ]
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    drive_names = read_client.list_drive_names("site123")
+
+    assert drive_names == ["Documents", "Shared Documents", "Site Assets"]
+    assert "Found 3 drives" in caplog.text
+    assert (
+        "Drive names: ['Documents', 'Shared Documents', 'Site Assets']" in caplog.text
     )
 
 
-@pytest.fixture
-def read_client(mock_config: SharePointConfig) -> ReadClient:
-    """
-    Instantiate ReadClient while mocking out _get_access_token
-    to avoid real network calls.
-    """
-    with patch.object(
-        ReadClient, "_get_access_token", return_value="mock_access_token"
-    ):
-        client = ReadClient(mock_config)
-    return client
-
-
-## ------------------------------------------------------------------------
-## list_sites
-## ------------------------------------------------------------------------
-@patch("requests.request")
-def test_list_sites_success(
-    mock_request: MagicMock,
+def test_list_drive_names_no_access_token(
     read_client: ReadClient,
+    mock_base_client: MagicMock,
 ) -> None:
-    """Test list_sites returns a list of site names on success."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
+
+    drive_names = read_client.list_drive_names("site123")
+
+    assert drive_names is None
+
+
+def test_list_drive_names_no_response(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when make_graph_request returns None."""
+    mock_base_client.make_graph_request.return_value = None
+
+    drive_names = read_client.list_drive_names("site123")
+
+    assert drive_names is None
+
+
+def test_list_drive_names_empty_list(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when no drives are found."""
+    mock_base_client.make_graph_request.return_value = {"value": []}
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    drive_names = read_client.list_drive_names("site123")
+
+    assert drive_names == []
+    assert "Found 0 drives" in caplog.text
+    assert "Drive names: []" in caplog.text
+
+
+def test_list_drive_names_missing_names(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when some drives don't have names."""
+    mock_base_client.make_graph_request.return_value = {
+        "value": [{"name": "Documents"}, {}, {"name": "Site Assets"}]  # Missing name
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    drive_names = read_client.list_drive_names("site123")
+
+    assert drive_names == ["Documents", None, "Site Assets"]
+    assert "Found 3 drives" in caplog.text
+    assert "Drive names: ['Documents', None, 'Site Assets']" in caplog.text
+
+
+def test_get_drive_id_success(read_client: ReadClient, caplog: Any) -> None:
+    """Test getting a drive ID successfully."""
+    caplog.set_level("INFO", logger="sharepycrud.readClient")
+    mock_response = {"value": [{"name": "Drive1", "id": "mock-drive-id"}]}
+
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.get_drive_id("mock-site-id", "Drive1")
+
+    assert result == "mock-drive-id"
+    assert "Found drive: Drive1, ID: mock-drive-id" in caplog.text
+
+
+def test_get_drive_id_no_access_token(read_client: ReadClient) -> None:
+    """Test that get_drive_id returns None when there is no access token."""
+    read_client.client.access_token = None
+    result = read_client.get_drive_id(site_id="mock-site-id", drive_name="Drive1")
+    assert result is None
+
+
+def test_get_drive_id_no_response(read_client: ReadClient) -> None:
+    """Test that get_drive_id returns None when make_graph_request returns None."""
+    with patch.object(read_client.client, "make_graph_request", return_value=None):
+        result = read_client.get_drive_id(site_id="mock-site-id", drive_name="Drive1")
+        assert result is None
+
+
+def test_get_drive_id_not_found(read_client: ReadClient, caplog: Any) -> None:
+    """Test that getting a drive ID returns None when drive is not found."""
+    caplog.set_level("INFO", logger="sharepycrud.readClient")
+    mock_response: Dict[str, List[Dict[str, str]]] = {"value": []}
+
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.get_drive_id("mock-site-id", "NonexistentDrive")
+
+    assert result is None
+    assert "Drive not found: NonexistentDrive" in caplog.text
+
+
+def test_list_drive_ids_with_drives(read_client: ReadClient, caplog: Any) -> None:
+    """
+    Test list_drive_ids when drives are present.
+    """
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    # Mock the make_graph_request to return drives
+    mock_response = {
         "value": [
-            {"name": "SiteA"},
-            {"name": "SiteB"},
+            {"id": "drive1", "name": "Drive 1"},
+            {"id": "drive2", "name": "Drive 2"},
         ]
     }
-    mock_request.return_value = mock_response
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.list_drive_ids("site123")
+        assert result == [("drive1", "Drive 1"), ("drive2", "Drive 2")]
+        assert "Found 2 drives" in caplog.text
 
-    result = read_client.list_sites()
-    assert isinstance(result, list)
-    assert result == ["SiteA", "SiteB"]
 
-    mock_request.assert_called_once()
+def test_list_drive_ids_no_drives(read_client: ReadClient, caplog: Any) -> None:
+    """
+    Test list_drive_ids when no drives are found.
+    """
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    # Mock the make_graph_request to return an empty list of drives
+    mock_response: Dict[str, List[Any]] = {"value": []}
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.list_drive_ids("site123")
+        assert result == []
+        assert "Found 0 drives" in caplog.text
 
 
-@patch("requests.request")
-def test_list_sites_empty(
-    mock_request: MagicMock,
-    read_client: ReadClient,
-) -> None:
-    """Test list_sites returns an empty list if no sites are found."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {"value": []}
-    mock_request.return_value = mock_response
+def test_list_drive_ids_no_access_token(read_client: ReadClient, caplog: Any) -> None:
+    """
+    Test list_drive_ids when access token is missing.
+    """
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
 
-    result: Optional[List[str]] = cast(Optional[List[str]], read_client.list_sites())
+    # Remove access token to simulate missing token
+    read_client.client.access_token = None
+    result = read_client.list_drive_ids("site123")
+    assert result == []
+    assert "Found" not in caplog.text
+
+
+def test_list_all_folders_with_folders(read_client: ReadClient, caplog: Any) -> None:
+    """Test list_all_folders with nested folder structure."""
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    root_response: Dict[str, List[Dict[str, Any]]] = {
+        "value": [
+            {
+                "name": "Folder1",
+                "id": "folder1",
+                "parentReference": {"path": "/drives/drive1"},
+                "folder": {},
+            }
+        ]
+    }
+
+    folder1_response: Dict[str, List[Dict[str, Any]]] = {
+        "value": [
+            {
+                "name": "SubFolder1",
+                "id": "subfolder1",
+                "parentReference": {"path": "/drives/drive1/Folder1"},
+                "folder": {},
+            }
+        ]
+    }
+
+    subfolder1_response: Dict[str, List[Dict[str, Any]]] = {"value": []}
+    call_count = 0
+
+    # Define a mock function to simulate make_graph_request to prevent recursion
+    def mock_make_graph_request(*args: Any, **kwargs: Any) -> Dict[str, Any]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return root_response
+        elif call_count == 2:
+            return folder1_response
+        else:
+            return subfolder1_response
+
+    call_count = 0
+    with patch.object(
+        read_client.client, "make_graph_request", side_effect=mock_make_graph_request
+    ):
+        result = read_client.list_all_folders("drive1")
+
+    expected: List[Dict[str, Any]] = [
+        {"name": "Folder1", "id": "folder1", "path": "/drives/drive1/Folder1"},
+        {
+            "name": "SubFolder1",
+            "id": "subfolder1",
+            "path": "/drives/drive1/Folder1/SubFolder1",
+        },
+    ]
+
+    assert result == expected
+    assert "Processing folder: Folder1 at level 0" in caplog.text
+    assert "Processing folder: SubFolder1 at level 1" in caplog.text
+    assert "Found 1 subfolders in Folder1" in caplog.text
+
+
+def test_list_all_folders_empty(read_client: ReadClient) -> None:
+    """Test list_all_folders when no folders exist."""
+    mock_response: Dict[str, List[Any]] = {"value": []}
+
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.list_all_folders("drive1")
+
     assert result == []
 
 
-@patch("requests.request")
-def test_list_sites_request_error(
-    mock_request: MagicMock,
-    read_client: ReadClient,
-    capsys: CaptureFixture[str],
-) -> None:
-    """Test list_sites returns None if request fails or token is invalid."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-        "403 Error"
-    )
-    mock_request.return_value = mock_response
+def test_list_all_folders_no_response(read_client: ReadClient) -> None:
+    """Test list_all_folders when make_graph_request returns None."""
+    with patch.object(read_client.client, "make_graph_request", return_value=None):
+        result = read_client.list_all_folders("drive1")
 
-    result = None
-    try:
-        result = cast(Optional[List[str]], read_client.list_sites())
-    except requests.exceptions.HTTPError:
-        pass
-
-    assert result is None
+    assert result == []
 
 
-@patch.object(ReadClient, "_get_access_token", return_value="mock_access_token")
-def test_list_sites_no_access_token(
-    mock_get_access_token: MagicMock,
-    mock_config: SharePointConfig,
-) -> None:
-    """
-    Test list_sites returns None if access_token is missing.
-    """
-    read_client = ReadClient(mock_config)
-    read_client.access_token = None
-
-    result = read_client.list_sites()
-    assert result is None
+def test_list_all_folders_no_access_token(read_client: ReadClient) -> None:
+    """Test list_all_folders when access token is missing."""
+    read_client.client.access_token = None
+    result = read_client.list_all_folders("drive1")
+    assert result == []
 
 
-## ------------------------------------------------------------------------
-## get_site_id
-## ------------------------------------------------------------------------
-@patch("requests.request")
-def test_get_site_id_success(mock_request: MagicMock, read_client: ReadClient) -> None:
-    """Test get_site_id returns the site ID on success."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {"id": "test-site-id"}
-    mock_request.return_value = mock_response
+def test_list_parent_folders_success(read_client: ReadClient, caplog: Any) -> None:
+    """Test that list_parent_folders returns the correct parent folders."""
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
 
-    site_id: Optional[str] = read_client.get_site_id("MySite")
-    assert site_id == "test-site-id"
-
-
-@patch("requests.request")
-def test_get_site_id_not_found(
-    mock_request: MagicMock, read_client: ReadClient, capsys: CaptureFixture[str]
-) -> None:
-    """Test get_site_id returns None if response is empty."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {}
-    mock_request.return_value = mock_response
-
-    site_id: Optional[str] = read_client.get_site_id("MissingSite")
-    assert site_id is None
-
-
-@patch.object(ReadClient, "_get_access_token", return_value="mock_access_token")
-def test_get_site_id_no_access_token(
-    mock_get_access_token: MagicMock,
-    mock_config: SharePointConfig,
-) -> None:
-    """
-    Test get_site_id returns None if access_token is missing.
-    """
-    read_client = ReadClient(mock_config)
-    read_client.access_token = None
-
-    site_id: Optional[str] = read_client.get_site_id("MissingSite")
-    assert site_id is None
-
-
-@patch("requests.request")
-def test_get_site_id_no_site_name(
-    mock_request: MagicMock,
-    read_client: ReadClient,
-) -> None:
-    """
-    Test get_site_id returns None if site name is not provided.
-    """
-    mock_request.return_value = MagicMock()
-    site_id: Optional[str] = read_client.get_site_id("")
-    assert site_id is None
-    mock_request.assert_not_called()
-
-
-## ------------------------------------------------------------------------
-## list_drives
-## ------------------------------------------------------------------------
-@patch("requests.request")
-def test_list_drives_success(
-    mock_request: MagicMock, read_client: ReadClient, capsys: CaptureFixture[str]
-) -> None:
-    """Test list_drives prints drive info and returns the response dict."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {
-        "value": [
-            {"name": "DriveA", "id": "123"},
-            {"name": "DriveB", "id": "456"},
-        ]
-    }
-    mock_request.return_value = mock_response
-
-    result: Optional[Dict[str, Any]] = read_client.list_drives("site123")
-    assert result == {
-        "value": [
-            {"name": "DriveA", "id": "123"},
-            {"name": "DriveB", "id": "456"},
-        ]
-    }
-
-    captured = capsys.readouterr()
-    assert "Drive: DriveA, ID: 123" in captured.out
-    assert "Drive: DriveB, ID: 456" in captured.out
-
-
-@patch("requests.request")
-def test_list_drives_none(
-    mock_request: MagicMock,
-    read_client: ReadClient,
-) -> None:
-    """Test list_drives returns None if no valid response."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {}
-    mock_request.return_value = mock_response
-
-    result: Optional[Dict[str, Any]] = read_client.list_drives("site123")
-    assert result is None
-
-
-@patch.object(ReadClient, "_get_access_token", return_value="mock_access_token")
-def test_list_drives_no_access_token(
-    mock_get_access_token: MagicMock,
-    mock_config: SharePointConfig,
-) -> None:
-    """Test list_drives returns None if access_token is missing."""
-    read_client = ReadClient(mock_config)
-    read_client.access_token = None
-
-
-@patch("requests.request")
-def test_list_drives_no_items_in_root(
-    mock_request: MagicMock, read_client: ReadClient, capsys: CaptureFixture[str]
-) -> None:
-    """Test list_drives prints 'No items in root folder' when the root folder is empty."""
-
-    mock_response_drives = MagicMock()
-    mock_response_drives.raise_for_status.side_effect = None
-    mock_response_drives.json.return_value = {
-        "value": [{"name": "TestDrive", "id": "drive123"}]
-    }
-
-    mock_response_root = MagicMock()
-    mock_response_root.raise_for_status.side_effect = None
-    mock_response_root.json.return_value = None
-
-    mock_request.side_effect = [mock_response_drives, mock_response_root]
-
-    result = read_client.list_drives("site123")
-
-    captured = capsys.readouterr()
-    assert "Drive: TestDrive, ID: drive123" in captured.out
-    assert "No items in root folder" in captured.out
-
-    assert result == {"value": [{"name": "TestDrive", "id": "drive123"}]}
-
-
-## ------------------------------------------------------------------------
-## get_drive_id
-## ------------------------------------------------------------------------
-@patch("requests.request")
-def test_get_drive_id_success(mock_request: MagicMock, read_client: ReadClient) -> None:
-    """Test get_drive_id returns a drive ID when found."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {
-        "value": [
-            {"name": "Files", "id": "drive123"},
-            {"name": "Documents", "id": "drive456"},
-        ]
-    }
-    mock_request.return_value = mock_response
-
-    drive_id: Optional[str] = read_client.get_drive_id("site123", "Files")
-    assert drive_id == "drive123"
-
-
-@patch("requests.request")
-def test_get_drive_id_not_found(
-    mock_request: MagicMock, read_client: ReadClient
-) -> None:
-    """Test get_drive_id returns None if drive name not in response."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {"value": []}
-    mock_request.return_value = mock_response
-
-    drive_id: Optional[str] = read_client.get_drive_id("site123", "NonExistentDrive")
-    assert drive_id is None
-
-
-## ------------------------------------------------------------------------
-## list_drive_ids
-## ------------------------------------------------------------------------
-@patch("requests.request")
-def test_list_drive_ids_success(
-    mock_request: MagicMock, read_client: ReadClient
-) -> None:
-    """Test list_drive_ids returns a list of (id, name) tuples."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {
-        "value": [
-            {"id": "driveA", "name": "A"},
-            {"id": "driveB", "name": "B"},
-        ]
-    }
-    mock_request.return_value = mock_response
-
-    ids: Optional[List[Tuple[str, str]]] = read_client.list_drive_ids("site123")
-    assert ids == [("driveA", "A"), ("driveB", "B")]
-
-
-@patch("requests.request")
-def test_list_drive_ids_empty(mock_request: MagicMock, read_client: ReadClient) -> None:
-    """Test list_drive_ids returns an empty list if no drives found."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {}
-    mock_request.return_value = mock_response
-
-    ids: Optional[List[Tuple[str, str]]] = read_client.list_drive_ids("site123")
-    assert ids == []
-
-
-## ------------------------------------------------------------------------
-## list_all_folders
-## ------------------------------------------------------------------------
-@patch("requests.request")
-def test_list_all_folders_success(
-    mock_request: MagicMock, read_client: ReadClient, capsys: CaptureFixture[str]
-) -> None:
-    """Test list_all_folders recursively collects folder names."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    # Simulate top-level has one folder
-    mock_response.json.side_effect = [
-        {
-            "value": [
-                {
-                    "name": "Folder1",
-                    "id": "f1",
-                    "folder": {},
-                    "parentReference": {"path": "/drives/f1"},
-                }
-            ]
-        },
-        {"value": []},  # no subfolders for "f1"
-    ]
-    mock_request.return_value = mock_response
-
-    folders: List[Dict[str, str]] = read_client.list_all_folders("drive123")
-    assert folders == [{"name": "Folder1", "id": "f1", "path": "/drives/f1/Folder1"}]
-
-    captured = capsys.readouterr()
-    assert "- Folder: Folder1 (ID: f1)" in captured.out
-
-
-@patch("requests.request")
-def test_list_all_folders_none(
-    mock_request: MagicMock, read_client: ReadClient
-) -> None:
-    """Test list_all_folders returns empty list if no response."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {}
-    mock_request.return_value = mock_response
-
-    folders: List[Dict[str, str]] = read_client.list_all_folders("driveXYZ")
-    assert folders == []
-
-
-## ------------------------------------------------------------------------
-## list_parent_folders
-## ------------------------------------------------------------------------
-@patch("requests.request")
-def test_list_parent_folders_success(
-    mock_request: MagicMock, read_client: ReadClient
-) -> None:
-    """Test list_parent_folders returns list of folder names & paths."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {
+    mock_response = {
         "value": [
             {
-                "name": "TopFolder",
-                "id": "folder123",
+                "name": "ParentFolder1",
+                "id": "folder1",
+                "parentReference": {"path": "/Drive1"},
                 "folder": {},
-                "parentReference": {"path": "/drives/12345/root"},
             },
             {
-                "name": "SomeFile.txt",
-                "id": "file123",
-                "file": {},
-                "parentReference": {"path": "/drives/12345/root"},
+                "name": "ParentFolder2",
+                "id": "folder2",
+                "parentReference": {"path": "/Drive1"},
+                "folder": {},
             },
         ]
     }
-    mock_request.return_value = mock_response
 
-    folders: Optional[List[Dict[str, str]]] = read_client.list_parent_folders(
-        "drive123"
-    )
-    assert folders == [{"name": "TopFolder", "path": "/drives/12345/root/TopFolder"}]
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.list_parent_folders("drive1")
 
-
-@patch("requests.request")
-def test_list_parent_folders_error_response(
-    mock_request: MagicMock, read_client: ReadClient, capsys: CaptureFixture[str]
-) -> None:
-    """Test list_parent_folders returns None if error is in response."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {
-        "error": {"code": "BadRequest", "message": "Something"}
-    }
-    mock_request.return_value = mock_response
-
-    folders: Optional[List[Dict[str, str]]] = read_client.list_parent_folders(
-        "driveXYZ"
-    )
-    assert folders is None
-
-    captured = capsys.readouterr()
-    assert "Error getting folder contents: BadRequest" in captured.out
+    expected = [
+        {"name": "ParentFolder1", "path": "/Drive1/ParentFolder1"},
+        {"name": "ParentFolder2", "path": "/Drive1/ParentFolder2"},
+    ]
+    assert result == expected
+    assert "Found parent folder: ParentFolder1" in caplog.text
+    assert "Found parent folder: ParentFolder2" in caplog.text
+    assert "Found 2 parent folders" in caplog.text
 
 
-## ------------------------------------------------------------------------
-## get_root_folder_id_by_name
-## ------------------------------------------------------------------------
-@patch("requests.request")
+def test_list_parent_folders_no_access_token(read_client: ReadClient) -> None:
+    """Test that list_parent_folders returns None if no access token is present."""
+    read_client.client.access_token = None
+    result = read_client.list_parent_folders("drive1")
+    assert result is None
+
+
+def test_list_parent_folders_no_response(read_client: ReadClient) -> None:
+    """Test that list_parent_folders returns None when make_graph_request returns None."""
+    with patch.object(read_client.client, "make_graph_request", return_value=None):
+        result = read_client.list_parent_folders("drive1")
+    assert result is None
+
+
+def test_list_parent_folders_empty(read_client: ReadClient, caplog: Any) -> None:
+    """Test that list_parent_folders handles no folders correctly."""
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+    mock_response: Dict[str, List[Any]] = {"value": []}
+
+    with patch.object(
+        read_client.client, "make_graph_request", return_value=mock_response
+    ):
+        result = read_client.list_parent_folders("drive1")
+
+    assert result == []
+    assert "Found 0 parent folders" in caplog.text
+
+
 def test_get_root_folder_id_by_name_success(
-    mock_request: MagicMock, read_client: ReadClient
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test get_root_folder_id_by_name returns folder ID on success."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {
+    """Test successful retrieval of root folder ID by name."""
+    # Mocking client responses with proper typing
+    mock_response: Dict[str, List[Dict[str, str]]] = {
         "value": [
-            {"name": "RootFolder", "id": "f123"},
-            {"name": "AnotherFolder", "id": "f999"},
+            {"name": "TestFolder", "id": "12345"},
+            {"name": "OtherFolder", "id": "67890"},
         ]
     }
-    mock_request.return_value = mock_response
 
-    folder_id: Optional[str] = read_client.get_root_folder_id_by_name(
-        "driveABC", "RootFolder"
-    )
-    assert folder_id == "f123"
+    mock_base_client.format_graph_url = MagicMock(return_value="mock_url")
+    mock_base_client.make_graph_request = MagicMock(return_value=mock_response)
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    folder_id = read_client.get_root_folder_id_by_name("dummy_drive_id", "TestFolder")
+
+    # Assertions
+    assert folder_id == "12345"
+    assert "Found folder: TestFolder, ID: 12345" in caplog.text
 
 
-@patch("requests.request")
-def test_get_root_folder_id_by_name_missing(
-    mock_request: MagicMock, read_client: ReadClient
+def test_get_root_folder_id_by_name_no_access_token(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test get_root_folder_id_by_name returns None if folder not found."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {"value": []}
-    mock_request.return_value = mock_response
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
 
-    folder_id: Optional[str] = read_client.get_root_folder_id_by_name(
-        "driveABC", "NonExistent"
-    )
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    folder_id = read_client.get_root_folder_id_by_name("dummy_drive_id", "TestFolder")
+
+    # Assertions
     assert folder_id is None
+    assert "Found folder:" not in caplog.text
 
 
-## ------------------------------------------------------------------------
-## get_folder_content
-## ------------------------------------------------------------------------
-@patch("requests.request")
-def test_get_folder_content_success(
-    mock_request: MagicMock, read_client: ReadClient, capsys: CaptureFixture[str]
+def test_get_root_folder_id_by_name_folder_not_found(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test get_folder_content returns a list of items in a folder."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {
+    mock_base_client.format_graph_url.return_value = "mock_url"
+    mock_base_client.make_graph_request.return_value = {
+        "value": [{"name": "OtherFolder", "id": "67890"}]
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    folder_id = read_client.get_root_folder_id_by_name("dummy_drive_id", "TestFolder")
+
+    # Assertions
+    assert folder_id is None
+    assert "Found folder:" not in caplog.text
+
+
+def test_get_folder_content_success(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test successful retrieval of folder contents."""
+    mock_base_client.format_graph_url.return_value = "mock_url"
+    mock_base_client.make_graph_request.return_value = {
         "value": [
             {
-                "id": "item1",
-                "name": "FolderA",
-                "folder": {},
-                "webUrl": "http://foo",
-                "size": 123,
+                "id": "123",
+                "name": "File1",
+                "webUrl": "http://mockurl.com/file1",
+                "size": 2048,
             },
             {
-                "id": "item2",
-                "name": "FileB.txt",
-                "file": {},
-                "webUrl": "http://bar",
-                "size": 456,
+                "id": "124",
+                "name": "Folder1",
+                "folder": {},
+                "webUrl": "http://mockurl.com/folder1",
             },
         ]
     }
-    mock_request.return_value = mock_response
 
-    contents: Optional[List[Dict[str, Any]]] = read_client.get_folder_content(
-        "driveABC", "folder123"
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    folder_contents = read_client.get_folder_content(
+        "dummy_drive_id", "dummy_folder_id"
     )
-    assert contents == [
+
+    assert folder_contents == [
         {
-            "id": "item1",
-            "name": "FolderA",
-            "type": "folder",
-            "webUrl": "http://foo",
-            "size": 123,
+            "id": "123",
+            "name": "File1",
+            "type": "file",
+            "webUrl": "http://mockurl.com/file1",
+            "size": 2048,
         },
         {
-            "id": "item2",
-            "name": "FileB.txt",
-            "type": "file",
-            "webUrl": "http://bar",
-            "size": 456,
+            "id": "124",
+            "name": "Folder1",
+            "type": "folder",
+            "webUrl": "http://mockurl.com/folder1",
+            "size": "N/A",
         },
     ]
-    captured = capsys.readouterr()
-    assert "Found 2 items in folder" in captured.out
+    assert "Found 1 folders and 1 files" in caplog.text
 
 
-@patch("requests.request")
-def test_get_folder_content_none(
-    mock_request: MagicMock, read_client: ReadClient
+def test_get_folder_content_no_access_token(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
 ) -> None:
-    """Test get_folder_content returns None if request fails or empty."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = None
-    mock_request.return_value = mock_response
-
-    contents: Optional[List[Dict[str, Any]]] = read_client.get_folder_content(
-        "driveABC", "folderXYZ"
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
+    folder_contents = read_client.get_folder_content(
+        "dummy_drive_id", "dummy_folder_id"
     )
-    assert contents is None
+    assert folder_contents is None
 
 
-## ------------------------------------------------------------------------
-## get_nested_folder_info
-## ------------------------------------------------------------------------
-@patch("requests.request")
+def test_get_folder_content_no_response(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+) -> None:
+    """Test when make_graph_request returns None."""
+    mock_base_client.format_graph_url.return_value = "mock_url"
+    mock_base_client.make_graph_request.return_value = None
+
+    folder_contents = read_client.get_folder_content(
+        "dummy_drive_id", "dummy_folder_id"
+    )
+    assert folder_contents is None
+
+
 def test_get_nested_folder_info_success(
-    mock_request: MagicMock, read_client: ReadClient
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """
-    Test get_nested_folder_info returns a dict with 'id' and 'name'
-    for a valid nested folder path.
-    """
-    # Suppose the path is "Folder1/Folder2". We'll need two requests:
-    # 1) For "root/children" with 'Folder1'
-    # 2) For "Folder1ID/children" with 'Folder2'
-    response1 = MagicMock()
-    response1.raise_for_status.side_effect = None
-    response1.json.return_value = {
-        "value": [
-            {"name": "Folder1", "folder": {}, "id": "Folder1ID"},
-            {"name": "OtherFolder", "folder": {}, "id": "OtherID"},
-        ]
-    }
-
-    response2 = MagicMock()
-    response2.raise_for_status.side_effect = None
-    response2.json.return_value = {
-        "value": [
-            {"name": "Folder2", "folder": {}, "id": "Folder2ID"},
-        ]
-    }
-
-    mock_request.side_effect = [response1, response2]
-
-    folder_info: Optional[Dict[str, str]] = read_client.get_nested_folder_info(
-        "driveABC", "Folder1/Folder2"
+    """Test successful nested folder traversal."""
+    mock_base_client.format_graph_url = MagicMock(
+        side_effect=lambda *args: f"mock_url/{'/'.join(args)}"
     )
-    assert folder_info == {"id": "Folder2ID", "name": "Folder2"}
-
-
-@patch("requests.request")
-def test_get_nested_folder_info_missing(
-    mock_request: MagicMock, read_client: ReadClient, capsys: CaptureFixture[str]
-) -> None:
-    """Test get_nested_folder_info returns None if a subfolder does not exist."""
-    response_missing = MagicMock()
-    response_missing.raise_for_status.side_effect = None
-    response_missing.json.return_value = {
-        "value": [
-            {"name": "SomeOtherFolder", "folder": {}, "id": "x123"},
+    mock_base_client.make_graph_request = MagicMock(
+        side_effect=[
+            {
+                "value": [
+                    {"id": "123", "name": "Folder1", "folder": {}, "extra": "data"}
+                ]
+            },
+            {
+                "value": [
+                    {"id": "456", "name": "SubFolder", "folder": {}, "extra": "data"}
+                ]
+            },
         ]
-    }
-    mock_request.return_value = response_missing
+    )
 
-    folder_info: Optional[Dict[str, str]] = read_client.get_nested_folder_info(
-        "driveABC", "Folder1/Folder2"
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    with patch.object(
+        read_client, "parse_folder_path", return_value=["Folder1", "SubFolder"]
+    ):
+        folder_info = read_client.get_nested_folder_info(
+            "dummy_drive_id", "Folder1/SubFolder"
+        )
+
+    assert folder_info == {"id": "456", "name": "SubFolder"}
+    assert "Processing folder: Folder1" in caplog.text
+    assert "Processing folder: SubFolder" in caplog.text
+    assert "Found deepest folder: SubFolder" in caplog.text
+
+
+def test_get_nested_folder_info_no_access_token(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+) -> None:
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
+    folder_info = read_client.get_nested_folder_info(
+        "dummy_drive_id", "Folder1/SubFolder"
     )
     assert folder_info is None
-    captured = capsys.readouterr()
-    assert "Folder 'Folder1' not found in path 'Folder1/Folder2'." in captured.out
 
 
-## ------------------------------------------------------------------------
-## file_exists_in_folder
-## ------------------------------------------------------------------------
-@patch("requests.request")
-def test_file_exists_in_folder_true(
-    mock_request: MagicMock, read_client: ReadClient
+def test_get_nested_folder_info_no_response(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
 ) -> None:
-    """Test file_exists_in_folder returns True if file is found."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {
+    """Test when make_graph_request returns None."""
+    mock_base_client.format_graph_url = MagicMock(return_value="mock_url")
+    mock_base_client.make_graph_request = MagicMock(return_value=None)
+
+    with patch.object(read_client, "parse_folder_path", return_value=["Folder1"]):
+        folder_info = read_client.get_nested_folder_info("dummy_drive_id", "Folder1")
+
+    assert folder_info is None
+
+
+def test_get_nested_folder_info_folder_not_found(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when folder is not found in the response."""
+    mock_base_client.format_graph_url = MagicMock(return_value="mock_url")
+    mock_base_client.make_graph_request = MagicMock(
+        return_value={"value": [{"id": "123", "name": "DifferentFolder", "folder": {}}]}
+    )
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    with patch.object(read_client, "parse_folder_path", return_value=["Folder1"]):
+        folder_info = read_client.get_nested_folder_info("dummy_drive_id", "Folder1")
+
+    assert folder_info is None
+    assert "Folder not found: Folder1" in caplog.text
+
+
+def test_get_nested_folder_info_empty_path(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+) -> None:
+    """Test when folder path is empty."""
+    with patch.object(read_client, "parse_folder_path", return_value=[]):
+        folder_info = read_client.get_nested_folder_info("dummy_drive_id", "")
+
+    assert folder_info is None
+
+
+def test_file_exists_in_folder_found(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when file is found in folder."""
+    mock_base_client.make_graph_request.return_value = {
         "value": [
-            {"name": "hello.txt", "file": {}},
-            {"name": "other.docx", "file": {}},
+            {
+                "name": "test.txt",
+                "file": {},
+            }
         ]
     }
-    mock_request.return_value = mock_response
 
-    exists: bool = read_client.file_exists_in_folder(
-        "driveABC", "folder123", "hello.txt"
-    )
-    assert exists is True
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    result = read_client.file_exists_in_folder("drive123", "folder123", "test.txt")
+
+    assert result is True
+    assert "Found file: test.txt" in caplog.text
 
 
-@patch("requests.request")
-def test_file_exists_in_folder_false(
-    mock_request: MagicMock, read_client: ReadClient
+def test_file_exists_in_folder_not_found(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test file_exists_in_folder returns False if file not found."""
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {"value": []}
-    mock_request.return_value = mock_response
+    """Test when file is not found in folder."""
+    mock_base_client.make_graph_request.return_value = {
+        "value": [
+            {
+                "name": "other.txt",
+                "file": {},
+            }
+        ]
+    }
 
-    exists: bool = read_client.file_exists_in_folder(
-        "driveABC", "folder123", "nope.txt"
-    )
-    assert exists is False
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+
+    result = read_client.file_exists_in_folder("drive123", "folder123", "test.txt")
+
+    assert result is False
+    assert "File not found: test.txt" in caplog.text
 
 
-## ------------------------------------------------------------------------
-## download_file
-## ------------------------------------------------------------------------
-@patch("requests.get")
-@patch.object(ReadClient, "get_site_id", return_value="site123")
-@patch.object(ReadClient, "get_drive_id", return_value="driveABC")
-@patch.object(ReadClient, "make_graph_request")
+def test_file_exists_in_folder_no_access_token(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+) -> None:
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
+
+    result = read_client.file_exists_in_folder("drive123", "folder123", "test.txt")
+
+    assert result is False
+
+
+def test_file_exists_in_folder_no_response(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+) -> None:
+    """Test when make_graph_request returns None."""
+    mock_base_client.make_graph_request.return_value = None
+
+    result = read_client.file_exists_in_folder("drive123", "folder123", "test.txt")
+
+    assert result is False
+
+
 def test_download_file_success(
-    mock_mgr: MagicMock,
-    mock_drive_id: MagicMock,
-    mock_site_id: MagicMock,
-    mock_get: MagicMock,
     read_client: ReadClient,
-    capsys: CaptureFixture[str],
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """
-    Test that download_file retrieves the file content correctly.
-    """
-    # Step 1: list drive contents to find 'fileID'
-    mock_mgr.return_value = {
-        "value": [
-            {"name": "doc.txt", "id": "fileID"},
-            {"name": "other.docx", "id": "someID"},
-        ]
-    }
+    """Test successful file download."""
+    # Mock responses for each step
+    mock_base_client.make_graph_request.side_effect = [
+        {"id": "site123"},  # get_site_id response
+        {"value": [{"name": "TestDrive", "id": "drive123"}]},  # get_drive_id response
+        {"value": [{"name": "test.txt", "id": "file123"}]},  # list_response
+    ]
 
-    # Step 2: Actual file content request
-    mock_get_response = MagicMock()
-    mock_get_response.status_code = 200
-    mock_get_response.content = b"Hello World"
-    mock_get.return_value = mock_get_response
+    # Mock the download request
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = b"file content"
 
-    content: Optional[bytes] = read_client.download_file(
-        "doc.txt", "MySite", "FilesDrive"
-    )
-    assert content == b"Hello World"
+    with patch("requests.get", return_value=mock_response):
+        caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+        result = read_client.download_file("test.txt", "TestSite", "TestDrive")
 
-    captured = capsys.readouterr()
-    assert "✓ Successfully downloaded: doc.txt" in captured.out
+    assert result == b"file content"
+    assert "Found file: test.txt" in caplog.text
+    assert "Successfully downloaded: test.txt" in caplog.text
 
 
-@patch("requests.get")
-@patch.object(ReadClient, "get_site_id", return_value="site123")
-@patch.object(ReadClient, "get_drive_id", return_value="driveABC")
-@patch.object(ReadClient, "make_graph_request")
+def test_download_file_no_access_token(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+) -> None:
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
+    result = read_client.download_file("test.txt", "TestSite", "TestDrive")
+    assert result is None
+
+
+def test_download_file_no_list_response(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+) -> None:
+    """Test when list_response is None."""
+    mock_base_client.make_graph_request.side_effect = [
+        {"id": "site123"},  # get_site_id response
+        {"value": [{"name": "TestDrive", "id": "drive123"}]},  # get_drive_id response
+        None,  # list_response is None
+    ]
+
+    result = read_client.download_file("test.txt", "TestSite", "TestDrive")
+    assert result is None
+
+
+def test_download_file_site_not_found(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when site is not found."""
+    mock_base_client.make_graph_request.return_value = None
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+    result = read_client.download_file("test.txt", "NonexistentSite", "TestDrive")
+
+    assert result is None
+    assert "Site not found: NonexistentSite" in caplog.text
+
+
+def test_download_file_drive_not_found(
+    read_client: ReadClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when drive is not found."""
+    mock_base_client.make_graph_request.side_effect = [
+        {"id": "site123"},  # get_site_id response
+        {"value": []},  # empty drive list
+    ]
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+    result = read_client.download_file("test.txt", "TestSite", "NonexistentDrive")
+
+    assert result is None
+    assert "Drive not found: NonexistentDrive" in caplog.text
+
+
 def test_download_file_not_found(
-    mock_mgr: MagicMock,
-    mock_drive_id: MagicMock,
-    mock_site_id: MagicMock,
-    mock_get: MagicMock,
     read_client: ReadClient,
-    capsys: CaptureFixture[str],
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test that download_file returns None if file not found."""
-    # The 'doc.txt' is not listed
-    mock_mgr.return_value = {
-        "value": [
-            {"name": "somethingelse.doc", "id": "someID"},
-        ]
-    }
+    """Test when file is not found."""
+    mock_base_client.make_graph_request.side_effect = [
+        {"id": "site123"},  # get_site_id response
+        {"value": [{"name": "TestDrive", "id": "drive123"}]},  # get_drive_id response
+        {"value": []},  # empty file list
+    ]
 
-    content: Optional[bytes] = read_client.download_file(
-        "doc.txt", "MySite", "FilesDrive"
-    )
-    assert content is None
+    caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+    result = read_client.download_file("nonexistent.txt", "TestSite", "TestDrive")
 
-    captured = capsys.readouterr()
-    assert "File 'doc.txt' not found in drive" in captured.out
+    assert result is None
+    assert "File not found: nonexistent.txt" in caplog.text
 
 
-@patch("requests.get")
-@patch.object(ReadClient, "get_site_id", return_value=None)
-def test_download_file_no_site_id(
-    mock_site_id: MagicMock,
-    mock_get: MagicMock,
+def test_download_file_download_failed(
     read_client: ReadClient,
-    capsys: CaptureFixture[str],
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test download_file returns None if site_id is missing."""
-    content: Optional[bytes] = read_client.download_file(
-        "doc.txt", "MissingSite", "DriveName"
-    )
-    assert content is None
+    """Test when download request fails."""
+    mock_base_client.make_graph_request.side_effect = [
+        {"id": "site123"},  # get_site_id response
+        {"value": [{"name": "TestDrive", "id": "drive123"}]},  # get_drive_id response
+        {"value": [{"name": "test.txt", "id": "file123"}]},  # list_response
+    ]
 
-    captured = capsys.readouterr()
-    assert "Failed to get site ID" in captured.out
+    # Mock failed download request
+    mock_response = MagicMock()
+    mock_response.status_code = 404
 
+    with patch("requests.get", return_value=mock_response):
+        caplog.set_level(logging.INFO, logger="sharepycrud.readClient")
+        result = read_client.download_file("test.txt", "TestSite", "TestDrive")
 
-@patch.object(ReadClient, "get_site_id", return_value="site123")
-@patch.object(ReadClient, "get_drive_id", return_value=None)
-def test_download_file_no_drive_id(
-    mock_drive_id: MagicMock,
-    mock_site_id: MagicMock,
-    read_client: ReadClient,
-    capsys: CaptureFixture[str],
-) -> None:
-    """Test download_file returns None if drive_id not found."""
-    content: Optional[bytes] = read_client.download_file(
-        "doc.txt", "MySite", "MissingDrive"
-    )
-    assert content is None
-
-    captured = capsys.readouterr()
-    assert "Drive 'MissingDrive' not found" in captured.out
-
-
-@patch("requests.get")
-@patch.object(ReadClient, "get_site_id", return_value="site123")
-@patch.object(ReadClient, "get_drive_id", return_value="driveABC")
-@patch.object(
-    ReadClient,
-    "make_graph_request",
-    return_value={"value": [{"name": "doc.txt", "id": "fileID"}]},
-)
-def test_download_file_http_error(
-    mock_mgr: MagicMock,
-    mock_drive_id: MagicMock,
-    mock_site_id: MagicMock,
-    mock_get: MagicMock,
-    read_client: ReadClient,
-    capsys: CaptureFixture[str],
-) -> None:
-    """Test that download_file returns None if final GET fails."""
-    mock_get_response = MagicMock()
-    mock_get_response.status_code = 404
-    mock_get.return_value = mock_get_response
-
-    content: Optional[bytes] = read_client.download_file(
-        "doc.txt", "MySite", "SomeDrive"
-    )
-    assert content is None
-
-    captured = capsys.readouterr()
-    assert "Error downloading file. Status code: 404" in captured.out
+    assert result is None
+    assert "Failed to download: test.txt" in caplog.text

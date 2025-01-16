@@ -1,14 +1,14 @@
-from sharepycrud.readClient import ReadClient
+from sharepycrud.clientFactory import ClientFactory
 from sharepycrud.config import SharePointConfig
+from sharepycrud.logger import setup_logging
 
 
 def main() -> None:
     """Example: Get drive ID by its name"""
-    # Initialize configuration
+    setup_logging(level="INFO", log_file="get_drive_id.log")
     config = SharePointConfig.from_env()
 
-    # Initialize ReadClient
-    client = ReadClient(config)
+    client = ClientFactory.create_read_client(config)
 
     site_id = client.get_site_id(site_name="TestSite1")
     if not site_id:

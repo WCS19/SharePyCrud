@@ -11,6 +11,8 @@ nav:
   - Getting Started: setup.md
   - Changelog: CHANGELOG.md
   - Contributing: CONTRIBUTING.md
+  - Architecture: ARCHITECTURE.md
+  - Logging: LOGGING.md
 
 # Add plugins
 plugins:

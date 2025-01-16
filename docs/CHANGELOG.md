@@ -39,6 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed utils module and moved functions to BaseClient.
 - Improved existing test suite
 
+## [0.2.1.dev1] - 2025-01-16
+
+### Added
+- Added list_drive_names method to ReadClient.
+- Renamed `list_drives` method to `list_drives_and_root_contents` to more appropriately describe what the method does.
+- Added comprehensive logging to BaseClient, CreateClient, and ReadClient.
+- Added business-focused logging messages for better operational visibility.
+- Added logging configuration examples in the examples directory.
+
+### Fixed
+- Fixed inconsistent logging levels across clients.
+- Fixed handler cleanup in logging setup.
+- Fixed missing logging in file operations.
+
+### Changed
+- Updated logging format for better readability.
+- Standardized logging patterns across all client classes.
+- Improved error message clarity for business users.
+
+
 
 ### Dependencies
 - Python 3.11+ requirement
@@ -49,15 +69,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## Roadmap
-
-### [0.2.0] - Planned
-- CREATE operations:
-  - Create lists
-  - Create document libraries
-  - Create folders
-  - Upload files
-- Improved error handling
-- Additional authentication methods
 
 ### [0.3.0] - Planned
 - UPDATE operations:

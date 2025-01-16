@@ -1,442 +1,451 @@
 import pytest
-import requests
-from unittest.mock import patch, MagicMock
-from typing import Optional
-
-from _pytest.capture import CaptureFixture
-
+from unittest.mock import MagicMock, patch
 from sharepycrud.createClient import CreateClient
+from sharepycrud.baseClient import BaseClient
 from sharepycrud.config import SharePointConfig
+from typing import Any, List, Dict, Optional
+import requests
+import logging
+import sys
+from pathlib import Path
 
 
 @pytest.fixture
-def mock_config() -> SharePointConfig:
-    """Fixture for a mock SharePointConfig."""
-    return SharePointConfig(
-        tenant_id="test-tenant-id",
-        client_id="test-client-id",
-        client_secret="test-client-secret",
-        sharepoint_url="test.sharepoint.com",
+def mock_base_client() -> BaseClient:
+    """Mocked BaseClient instance."""
+    base_client = MagicMock(spec=BaseClient)
+    base_client.access_token = "mock_access_token"
+    base_client.config = SharePointConfig(
+        tenant_id="mock-tenant-id",
+        client_id="mock-client-id",
+        client_secret="mock-client-secret",
+        sharepoint_url="https://mock.sharepoint.com",
     )
+    return base_client
 
 
 @pytest.fixture
-def create_client(mock_config: SharePointConfig) -> CreateClient:
-    """
-    Instantiate CreateClient while mocking out its token retrieval
-    to avoid real network calls.
-    """
+def create_client(mock_base_client: BaseClient) -> CreateClient:
+    """CreateClient initialized with a mocked BaseClient."""
+    return CreateClient(mock_base_client)
+
+
+def test_make_graph_request(create_client: CreateClient) -> None:
+    """Test delegating make_graph_request to BaseClient."""
     with patch.object(
-        CreateClient, "_get_access_token", return_value="mock_access_token"
-    ):
-        client = CreateClient(mock_config)
-    return client
+        create_client.client, "make_graph_request", return_value={"key": "value"}
+    ) as mock_method:
+        result = create_client.make_graph_request(
+            "https://mock-url.com", "POST", {"data": "test"}
+        )
+        mock_method.assert_called_once_with(
+            "https://mock-url.com", "POST", {"data": "test"}
+        )
+        assert result == {"key": "value"}
 
 
-## -----------------------------
-## Tests for create_folder
-## -----------------------------
-@patch("requests.post")
+def test_format_graph_url(create_client: CreateClient) -> None:
+    """Test delegating format_graph_url to BaseClient."""
+    with patch.object(
+        create_client.client, "format_graph_url", return_value="https://mocked-url.com"
+    ) as mock_method:
+        result = create_client.format_graph_url("sites", "mock-site")
+        mock_method.assert_called_once_with("sites", "mock-site")
+        assert result == "https://mocked-url.com"
+
+
+def test_parse_folder_path(create_client: CreateClient) -> None:
+    """Test delegating parse_folder_path to BaseClient."""
+    with patch.object(
+        create_client.client, "parse_folder_path", return_value=["Folder1", "Folder2"]
+    ) as mock_method:
+        result = create_client.parse_folder_path("/Folder1/Folder2/")
+        mock_method.assert_called_once_with("/Folder1/Folder2/")
+        assert result == ["Folder1", "Folder2"]
+
+
 def test_create_folder_success(
-    mock_post: MagicMock, create_client: CreateClient
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test create_folder returns a valid folder ID on success (201)."""
-    mock_response = MagicMock()
-    mock_response.status_code = 201
-    mock_response.json.return_value = {"id": "fake-folder-id"}
-    mock_post.return_value = mock_response
+    """Test successful folder creation."""
+    mock_base_client.make_graph_request.return_value = {
+        "id": "folder123",
+        "name": "TestFolder",
+    }
 
-    folder_id: Optional[str] = create_client.create_folder("drive123", "TestFolder")
-    assert folder_id == "fake-folder-id"
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
 
-    expected_url = create_client.format_graph_url("drives", "drive123", "root/children")
-    mock_post.assert_called_once_with(
-        expected_url,
-        headers={
-            "Authorization": "Bearer mock_access_token",
-            "Content-Type": "application/json",
-        },
-        json={
-            "name": "TestFolder",
-            "folder": {},
-            "@microsoft.graph.conflictBehavior": "fail",
-        },
-    )
+    folder_id = create_client.create_folder("drive123", "TestFolder")
+
+    assert folder_id == "folder123"
+    assert "Creating folder: TestFolder" in caplog.text
+    assert "Successfully created folder: TestFolder" in caplog.text
 
 
-@patch("requests.post")
-def test_create_folder_failure(
-    mock_post: MagicMock, create_client: CreateClient, capsys: CaptureFixture[str]
-) -> None:
-    """Test create_folder returns None and prints error on non-201 response."""
-    mock_response = MagicMock()
-    mock_response.status_code = 400
-    mock_response.json.return_value = {"error": "Bad Request"}
-    mock_post.return_value = mock_response
-
-    folder_id: Optional[str] = create_client.create_folder("drive123", "FailFolder")
-    assert folder_id is None
-
-    captured = capsys.readouterr()
-    assert "Error creating folder: 400" in captured.out
-    assert "Bad Request" in captured.out
-
-
-@patch("requests.post")
 def test_create_folder_no_access_token(
-    mock_post: MagicMock, create_client: CreateClient
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
 ) -> None:
-    """Test create_folder returns None if access_token is missing."""
-    create_client.access_token = None
-    folder_id: Optional[str] = create_client.create_folder("drive123", "TestFolder")
-    assert folder_id is None
-    assert create_client.access_token is None
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
 
-
-@patch("requests.post")
-def test_create_folder_invalid_folder_id(
-    mock_post: MagicMock, create_client: CreateClient, capsys: CaptureFixture[str]
-) -> None:
-    """
-    Test create_folder prints an error and returns None when the created folder ID is not a string.
-    """
-
-    mock_response = MagicMock()
-    mock_response.status_code = 201  # HTTP 201 Created
-    mock_response.json.return_value = {"id": 12345}  # ID is an integer, not a string
-    mock_post.return_value = mock_response
-
-    folder_id: Optional[str] = create_client.create_folder("drive123", "TestFolder")
+    folder_id = create_client.create_folder("drive123", "TestFolder")
 
     assert folder_id is None
 
-    captured = capsys.readouterr()
-    assert "Error: Created folder ID is not a string" in captured.out
 
-
-## -----------------------------
-## Tests for create_file
-## -----------------------------
-@patch("requests.post")
-def test_create_file_success(mock_post: MagicMock, create_client: CreateClient) -> None:
-    """Test create_file returns a valid file ID on success."""
-    mock_response = MagicMock()
-    mock_response.status_code = 201
-    mock_response.json.return_value = {"id": "fake-file-id"}
-    mock_post.return_value = mock_response
-
-    file_id: Optional[str] = create_client.create_file(
-        "drive123", "folderABC", "NewFile.txt"
-    )
-    assert file_id == "fake-file-id"
-
-    expected_url = create_client.format_graph_url(
-        "drives", "drive123", "items", "folderABC", "children"
-    )
-    mock_post.assert_called_once_with(
-        expected_url,
-        headers={
-            "Authorization": "Bearer mock_access_token",
-            "Content-Type": "application/json",
-        },
-        json={
-            "name": "NewFile.txt",
-            "file": {},
-            "@microsoft.graph.conflictBehavior": "fail",
-        },
-    )
-
-
-@patch("requests.post")
-def test_create_file_failure(
-    mock_post: MagicMock, create_client: CreateClient, capsys: CaptureFixture[str]
+def test_create_folder_no_response(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test create_file returns None and prints error on failure."""
-    mock_response = MagicMock()
-    mock_response.status_code = 409
-    mock_response.json.return_value = {"error": "Conflict"}
-    mock_post.return_value = mock_response
+    """Test when make_graph_request returns None."""
+    mock_base_client.make_graph_request.return_value = None
 
-    file_id: Optional[str] = create_client.create_file(
-        "drive123", "folderABC", "DuplicateFile.txt"
-    )
-    assert file_id is None
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
 
-    captured = capsys.readouterr()
-    assert "Error creating file: 409" in captured.out
-    assert "Conflict" in captured.out
+    folder_id = create_client.create_folder("drive123", "TestFolder")
+
+    assert folder_id is None
+    assert "Creating folder: TestFolder" in caplog.text
+    assert "Failed to create folder: TestFolder" in caplog.text
 
 
-@patch("requests.post")
+def test_create_folder_invalid_id(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when folder ID is not a string."""
+    mock_base_client.make_graph_request.return_value = {
+        "id": 123,  # Invalid ID type
+        "name": "TestFolder",
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    folder_id = create_client.create_folder("drive123", "TestFolder")
+
+    assert folder_id is None
+    assert "Creating folder: TestFolder" in caplog.text
+    assert "Failed to create folder: TestFolder" in caplog.text
+
+
+def test_create_file_success(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test successful file creation."""
+    mock_base_client.make_graph_request.return_value = {
+        "id": "file123",
+        "name": "test.txt",
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    file_id = create_client.create_file("drive123", "folder123", "test.txt")
+
+    assert file_id == "file123"
+    assert "Creating file: test.txt" in caplog.text
+    assert "Successfully created file: test.txt" in caplog.text
+
+
 def test_create_file_no_access_token(
-    mock_post: MagicMock, create_client: CreateClient
-) -> None:
-    """Test create_file returns None if access_token is missing."""
-    create_client.access_token = None
-    file_id: Optional[str] = create_client.create_file(
-        "drive123", "TestFolder", "TestFile.txt"
-    )
-    assert file_id is None
-    assert create_client.access_token is None
-
-
-@patch("requests.post")
-def test_create_file_invalid_file_id(
-    mock_post: MagicMock, create_client: CreateClient, capsys: CaptureFixture[str]
-) -> None:
-    """
-    Test create_file prints an error and returns None when the created file ID is not a string.
-    """
-    mock_response = MagicMock()
-    mock_response.status_code = 201  # HTTP 201 Created
-    mock_response.json.return_value = {"id": 12345}  # ID is an integer, not a string
-    mock_post.return_value = mock_response
-
-    file_id: Optional[str] = create_client.create_file(
-        "drive123", "TestFolder", "TestFile.txt"
-    )
-
-    assert file_id is None
-    captured = capsys.readouterr()
-    assert "Error: Created file ID is not a string" in captured.out
-
-
-## -----------------------------
-## Tests for upload_file_to_folder
-## -----------------------------
-@patch("builtins.open", create=True)
-@patch("requests.put")
-def test_upload_file_to_folder_success(
-    mock_put: MagicMock, mock_open: MagicMock, create_client: CreateClient
-) -> None:
-    """Test upload_file_to_folder returns valid file ID on success."""
-    # Mock file reading
-    mock_file = MagicMock()
-    mock_file.read.return_value = b"file content"
-    mock_open.return_value.__enter__.return_value = mock_file
-
-    # Mock the PUT response
-    mock_response = MagicMock()
-    mock_response.status_code = 201
-    mock_response.json.return_value = {"id": "uploaded-file-id"}
-    mock_put.return_value = mock_response
-
-    file_id: Optional[str] = create_client.upload_file_to_folder(
-        "drive123", "folderABC", "upload.txt", "/path/to/upload.txt"
-    )
-    assert file_id == "uploaded-file-id"
-
-    expected_url = create_client.format_graph_url(
-        "drives", "drive123", "items", "folderABC:/upload.txt:/content"
-    )
-    mock_put.assert_called_once_with(
-        expected_url,
-        headers={
-            "Authorization": "Bearer mock_access_token",
-            "Content-Type": "application/octet-stream",
-        },
-        data=b"file content",
-    )
-
-
-@patch("builtins.open", create=True)
-@patch("requests.put")
-def test_upload_file_to_folder_failure(
-    mock_put: MagicMock,
-    mock_open: MagicMock,
     create_client: CreateClient,
-    capsys: CaptureFixture[str],
+    mock_base_client: MagicMock,
 ) -> None:
-    """Test upload_file_to_folder returns None and prints error on failure."""
-    # Mock file reading
-    mock_file = MagicMock()
-    mock_file.read.return_value = b"file content"
-    mock_open.return_value.__enter__.return_value = mock_file
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
 
-    # Mock the PUT response
-    mock_response = MagicMock()
-    mock_response.status_code = 404
-    mock_response.json.return_value = {"error": "Not Found"}
-    mock_put.return_value = mock_response
+    file_id = create_client.create_file("drive123", "folder123", "test.txt")
 
-    file_id: Optional[str] = create_client.upload_file_to_folder(
-        "drive123", "folderABC", "fail.txt", "/path/to/fail.txt"
-    )
     assert file_id is None
 
-    captured = capsys.readouterr()
-    assert "Error uploading file: 404" in captured.out
-    assert "Not Found" in captured.out
 
-
-@patch("requests.put")
-def test_upload_file_to_folder_no_access_token(
-    mock_put: MagicMock, create_client: CreateClient
-) -> None:
-    """Test upload_file_to_folder returns None if access_token is missing."""
-    create_client.access_token = None
-
-    file_id: Optional[str] = create_client.upload_file_to_folder(
-        "drive123", "TestFolder", "TestFile.txt", "/path/to/TestFile.txt"
-    )
-
-    assert file_id is None
-    mock_put.assert_not_called()
-
-
-@patch("builtins.open", create=True)
-@patch("requests.put")
-def test_upload_file_to_folder_invalid_file_id(
-    mock_put: MagicMock,
-    mock_open: MagicMock,
+def test_create_file_no_response(
     create_client: CreateClient,
-    capsys: CaptureFixture[str],
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test upload_file_to_folder prints an error and returns None when the uploaded file ID is not a string."""
+    """Test when make_graph_request returns None."""
+    mock_base_client.make_graph_request.return_value = None
 
-    mock_file = MagicMock()
-    mock_file.read.return_value = b"file content"
-    mock_open.return_value.__enter__.return_value = mock_file
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
 
-    mock_response = MagicMock()
-    mock_response.status_code = 201  # HTTP 201 Created
-    mock_response.json.return_value = {"id": 12345}  # ID is an integer, not a string
-    mock_put.return_value = mock_response
+    file_id = create_client.create_file("drive123", "folder123", "test.txt")
 
-    file_id: Optional[str] = create_client.upload_file_to_folder(
-        "drive123", "TestFolder", "TestFile.txt", "/path/to/TestFile.txt"
+    assert file_id is None
+    assert "Creating file: test.txt" in caplog.text
+    assert "Failed to create file: test.txt" in caplog.text
+
+
+def test_create_file_invalid_id(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when file ID is not a string."""
+    mock_base_client.make_graph_request.return_value = {
+        "id": 123,  # Invalid ID type
+        "name": "test.txt",
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    file_id = create_client.create_file("drive123", "folder123", "test.txt")
+
+    assert file_id is None
+    assert "Creating file: test.txt" in caplog.text
+    assert "Failed to create file: test.txt" in caplog.text
+
+
+def test_upload_file_success(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+    tmp_path: Path,
+) -> None:
+    """Test successful file upload."""
+    # Create a temporary file
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("test content")
+
+    mock_base_client.make_graph_request.return_value = {
+        "id": "file123",
+        "name": "test.txt",
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    file_id = create_client.upload_file_to_folder(
+        "drive123", "folder123", "test.txt", str(test_file)
+    )
+
+    assert file_id == "file123"
+    assert "Uploading file: test.txt" in caplog.text
+    assert "Successfully uploaded file: test.txt" in caplog.text
+
+
+def test_upload_file_no_access_token(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    tmp_path: Path,
+) -> None:
+    """Test when access token is missing."""
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("test content")
+
+    mock_base_client.access_token = None
+
+    file_id = create_client.upload_file_to_folder(
+        "drive123", "folder123", "test.txt", str(test_file)
     )
 
     assert file_id is None
 
-    captured = capsys.readouterr()
-    assert "Error: Uploaded file ID is not a string" in captured.out
 
+def test_upload_file_not_found(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when file is not found."""
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
 
-## -----------------------------
-## Tests for create_list
-## -----------------------------
-@patch("requests.post")
-def test_create_list_success(mock_post: MagicMock, create_client: CreateClient) -> None:
-    """Test create_list returns the list ID on success."""
-    mock_response = MagicMock()
-    mock_response.status_code = 201
-    mock_response.json.return_value = {"id": "new-list-id"}
-    mock_post.return_value = mock_response
-
-    list_id: Optional[str] = create_client.create_list("site123", "MyList")
-    assert list_id == "new-list-id"
-
-    expected_url = create_client.format_graph_url("sites", "site123", "lists")
-    mock_post.assert_called_once_with(
-        expected_url,
-        headers={
-            "Authorization": "Bearer mock_access_token",
-            "Content-Type": "application/json",
-        },
-        json={
-            "displayName": "MyList",
-            "list": {
-                "template": "genericList",
-            },
-        },
+    file_id = create_client.upload_file_to_folder(
+        "drive123", "folder123", "test.txt", "nonexistent.txt"
     )
 
+    assert file_id is None
+    assert "Uploading file: test.txt" in caplog.text
+    assert "File not found: test.txt" in caplog.text
 
-@patch("requests.post")
-def test_create_list_failure(
-    mock_post: MagicMock, create_client: CreateClient, capsys: CaptureFixture[str]
+
+def test_upload_file_no_response(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+    tmp_path: Path,
 ) -> None:
-    """Test create_list returns None and prints error on failure."""
-    mock_response = MagicMock()
-    mock_response.status_code = 403
-    mock_response.json.return_value = {"error": "Forbidden"}
-    mock_post.return_value = mock_response
+    """Test when make_graph_request returns None."""
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("test content")
 
-    list_id: Optional[str] = create_client.create_list("site123", "MyFailList")
-    assert list_id is None
+    mock_base_client.make_graph_request.return_value = None
 
-    captured = capsys.readouterr()
-    assert "Error creating list: 403" in captured.out
-    assert "Forbidden" in captured.out
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    file_id = create_client.upload_file_to_folder(
+        "drive123", "folder123", "test.txt", str(test_file)
+    )
+
+    assert file_id is None
+    assert "Uploading file: test.txt" in caplog.text
+    assert "Failed to upload file: test.txt" in caplog.text
 
 
-@patch("requests.post")
+def test_upload_file_invalid_id(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+    tmp_path: Path,
+) -> None:
+    """Test when file ID is not a string."""
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("test content")
+
+    mock_base_client.make_graph_request.return_value = {
+        "id": 123,  # Invalid ID type
+        "name": "test.txt",
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    file_id = create_client.upload_file_to_folder(
+        "drive123", "folder123", "test.txt", str(test_file)
+    )
+
+    assert file_id is None
+    assert "Uploading file: test.txt" in caplog.text
+    assert "Failed to upload file: test.txt" in caplog.text
+
+
+def test_create_list_success(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test successful list creation."""
+    mock_base_client.make_graph_request.return_value = {
+        "id": "list123",
+        "displayName": "TestList",
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    list_id = create_client.create_list("site123", "TestList")
+
+    assert list_id == "list123"
+    assert "Creating list: TestList" in caplog.text
+    assert "Successfully created list: TestList" in caplog.text
+
+
 def test_create_list_no_access_token(
-    mock_post: MagicMock, create_client: CreateClient
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
 ) -> None:
-    "Test create list returns None if access_token is missing"
-    create_client.access_token = None
-    list_id: Optional[str] = create_client.create_list("site123", "MyList")
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
+
+    list_id = create_client.create_list("site123", "TestList")
+
     assert list_id is None
-    mock_post.assert_not_called()
 
 
-@patch("requests.post")
-def test_create_list_invalid_list_id(
-    mock_post: MagicMock, create_client: CreateClient, capsys: CaptureFixture[str]
+def test_create_list_no_response(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test create_list prints an error and returns None when the created list ID is not a string."""
-    mock_response = MagicMock()
-    mock_response.status_code = 201
-    mock_response.json.return_value = {"id": 12345}
-    mock_post.return_value = mock_response
+    """Test when make_graph_request returns None."""
+    mock_base_client.make_graph_request.return_value = None
 
-    list_id: Optional[str] = create_client.create_list("site123", "MyList")
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    list_id = create_client.create_list("site123", "TestList")
+
     assert list_id is None
-    captured = capsys.readouterr()
-    assert "Error: Created list ID is not a string" in captured.out
+    assert "Creating list: TestList" in caplog.text
+    assert "Failed to create list: TestList" in caplog.text
 
 
-## -----------------------------
-## Tests for create_document_library
-## -----------------------------
-@patch("requests.post")
+def test_create_list_invalid_id(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when list ID is not a string."""
+    mock_base_client.make_graph_request.return_value = {
+        "id": 123,  # Invalid ID type
+        "displayName": "TestList",
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    list_id = create_client.create_list("site123", "TestList")
+
+    assert list_id is None
+    assert "Creating list: TestList" in caplog.text
+    assert "Failed to create list: TestList" in caplog.text
+
+
+def test_create_list_custom_template(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test list creation with custom template."""
+    mock_base_client.make_graph_request.return_value = {
+        "id": "list123",
+        "displayName": "TestList",
+    }
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    list_id = create_client.create_list("site123", "TestList", "customTemplate")
+
+    assert list_id == "list123"
+    assert "Creating list: TestList" in caplog.text
+    assert "Successfully created list: TestList" in caplog.text
+
+
 def test_create_document_library_success(
-    mock_post: MagicMock, create_client: CreateClient
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test create_document_library returns library ID on success."""
-    mock_response = MagicMock()
-    mock_response.status_code = 201
-    mock_response.json.return_value = {"id": "new-library-id"}
-    mock_post.return_value = mock_response
+    """Test successful document library creation."""
+    mock_base_client.make_graph_request.return_value = {
+        "id": "lib123",
+        "displayName": "TestLibrary",
+    }
 
-    library_id: Optional[str] = create_client.create_document_library(
-        "site123", "DocsLibrary"
-    )
-    assert library_id == "new-library-id"
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
 
-    expected_url = create_client.format_graph_url("sites", "site123", "lists")
-    mock_post.assert_called_once_with(
-        expected_url,
-        headers={
-            "Authorization": "Bearer mock_access_token",
-            "Content-Type": "application/json",
-        },
-        json={
-            "displayName": "DocsLibrary",
-            "list": {
-                "template": "documentLibrary",
-            },
-        },
-    )
+    library_id = create_client.create_document_library("site123", "TestLibrary")
+
+    assert library_id == "lib123"
+    assert "Creating document library: TestLibrary" in caplog.text
+    assert "Successfully created document library: TestLibrary" in caplog.text
 
 
-@patch("requests.post")
-def test_create_document_library_failure(
-    mock_post: MagicMock, create_client: CreateClient, capsys: CaptureFixture[str]
+def test_create_document_library_no_access_token(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
 ) -> None:
-    """Test create_document_library returns None and prints error on failure."""
-    mock_response = MagicMock()
-    mock_response.status_code = 500
-    mock_response.json.return_value = {"error": "Server Error"}
-    mock_post.return_value = mock_response
+    """Test when access token is missing."""
+    mock_base_client.access_token = None
 
-    library_id: Optional[str] = create_client.create_document_library(
-        "site123", "BadLibrary"
-    )
+    library_id = create_client.create_document_library("site123", "TestLibrary")
+
     assert library_id is None
 
-    captured = capsys.readouterr()
-    assert "Error creating document library: 500" in captured.out
-    assert "Server Error" in captured.out
+
+def test_create_document_library_creation_failed(
+    create_client: CreateClient,
+    mock_base_client: MagicMock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test when document library creation fails."""
+    mock_base_client.make_graph_request.return_value = None
+
+    caplog.set_level(logging.INFO, logger="sharepycrud.createClient")
+
+    library_id = create_client.create_document_library("site123", "TestLibrary")
+
+    assert library_id is None
+    assert "Creating document library: TestLibrary" in caplog.text
+    assert "Failed to create document library: TestLibrary" in caplog.text

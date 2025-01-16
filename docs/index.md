@@ -1,5 +1,5 @@
 # SharePyCrud Package
-[![Version](https://img.shields.io/badge/version-0.2.0.dev1-blue)](#)
+[![Version](https://img.shields.io/badge/version-0.2.1.dev1-blue)](#)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 ![Tests Status](https://github.com/WCS19/SharePyCrud/actions/workflows/python-app.yml/badge.svg)
 [![codecov](https://codecov.io/gh/WCS19/SharePyCrud/branch/main/graph/badge.svg?token=<CODECOV_TOKEN>)](https://codecov.io/gh/WCS19/SharePyCrud)
@@ -56,8 +56,12 @@ Below are useful references to help you understand and work with SharePyCrud:
 1. [Microsoft Graph API Documentation](https://learn.microsoft.com/en-us/graph/)
 2. [SharePoint REST API Documentation](https://learn.microsoft.com/en-us/sharepoint/dev/sp-add-ins/get-to-know-the-sharepoint-rest-service)
 3. [Python Requests Library](https://docs.python-requests.org/en/latest/)
+4. [Singleton Pattern in Python – A Complete Guide](https://www.geeksforgeeks.org/singleton-pattern-in-python-a-complete-guide/)
+5. [The Singleton Pattern](https://python-patterns.guide/gang-of-four/singleton/)
+6. [Python Logging Tutorial](https://docs.python.org/3/howto/logging.html)
 
-These resources will provide background on the APIs and libraries used in this project.
+These resources will provide background on the APIs, libraries and design patterns used in this project.
+
 
 ---
 

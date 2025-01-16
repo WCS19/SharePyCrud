@@ -1,10 +1,10 @@
+from unittest.mock import patch, MagicMock
 import pytest
 import requests
-from unittest.mock import patch, MagicMock
-from typing import Dict, Any
-
 from sharepycrud.baseClient import BaseClient
 from sharepycrud.config import SharePointConfig
+from typing import Any, Dict, cast, Optional
+import logging
 
 
 @pytest.fixture
@@ -14,247 +14,374 @@ def mock_config() -> SharePointConfig:
         tenant_id="test-tenant",
         client_id="test-client-id",
         client_secret="test-client-secret",
-        sharepoint_url="test.sharepoint.com",
+        sharepoint_url="https://test.sharepoint.com",
     )
 
 
 @pytest.fixture
 def base_client(mock_config: SharePointConfig) -> BaseClient:
-    """
-    Create a BaseClient instance.
-    We'll patch _get_access_token to avoid real network calls in the fixture.
-    """
+    """Fixture for BaseClient with a mocked access token."""
     with patch.object(
         BaseClient, "_get_access_token", return_value="mock_access_token"
     ):
-        client = BaseClient(mock_config)
-    return client
+        return BaseClient(mock_config)
 
 
-## Test _get_access_token
-@patch("requests.post")
-def test_get_access_token_success(
-    mock_post: MagicMock, mock_config: SharePointConfig
-) -> None:
+def test_init_no_access_token(caplog: Any) -> None:
     """
-    Test that _get_access_token successfully returns a token on 200 status.
+    Test that BaseClient.__init__ raises a ValueError if no access token is obtained.
+    This covers the lines that log an error and raise ValueError.
     """
-    # Mock a successful token response
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {"access_token": "fake_token"}
-    mock_post.return_value = mock_response
-
-    # We directly call _get_access_token by instantiating the client
-    client = BaseClient(mock_config)  # triggers _get_access_token in __init__
-    assert client.access_token == "fake_token"
-    mock_post.assert_called_once_with(
-        "https://login.microsoftonline.com/test-tenant/oauth2/v2.0/token",
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        data={
-            "grant_type": "client_credentials",
-            "client_id": "test-client-id",
-            "client_secret": "test-client-secret",
-            "scope": "https://graph.microsoft.com/.default",
-        },
+    config: SharePointConfig = SharePointConfig(
+        tenant_id="test-tenant",
+        client_id="test-client-id",
+        client_secret="test-client-secret",
+        sharepoint_url="https://test.sharepoint.com",
     )
 
+    # Patch _get_access_token to return None, triggering the failure path
+    with patch.object(BaseClient, "_get_access_token", return_value=None):
+        with pytest.raises(ValueError, match="Failed to obtain access token"):
+            BaseClient(config)
 
-@patch("requests.post")
-def test_get_access_token_failure(
-    mock_post: MagicMock, mock_config: SharePointConfig
+    assert "Failed to obtain access token during initialization" in caplog.text
+
+
+def test_get_access_token_success(mock_config: SharePointConfig, caplog: Any) -> None:
+    """
+    Test that _get_access_token returns a valid token.
+    """
+    caplog.set_level(logging.DEBUG, logger="sharepycrud")
+
+    # 1) Patch _get_access_token for __init__ so it won't fail immediately
+    with patch.object(
+        BaseClient, "_get_access_token", return_value="constructor_mock_token"
+    ):
+        client: BaseClient = BaseClient(mock_config)
+
+    # 2) Now use the *real* _get_access_token to test success scenario
+    with patch("requests.post") as mock_post:
+        mock_response: MagicMock = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"access_token": "test_access_token"}
+        mock_post.return_value = mock_response
+
+        token: Optional[str] = client._get_access_token()
+        assert token == "test_access_token"
+    assert "Successfully obtained access token" in caplog.text
+
+
+def test_get_access_token_missing_token(
+    mock_config: SharePointConfig, caplog: Any
 ) -> None:
     """
-    Test that _get_access_token returns None if the request fails.
+    Test that _get_access_token raises a ValueError if the response is JSON but missing 'access_token'.
     """
-    # Mock a failing response
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = requests.exceptions.RequestException(
-        "Network error"
-    )
-    mock_post.return_value = mock_response
+    # 1) Patch _get_access_token for __init__ so it won't fail
+    with patch.object(
+        BaseClient, "_get_access_token", return_value="constructor_mock_token"
+    ):
+        client: BaseClient = BaseClient(mock_config)
 
-    # Attempting to instantiate BaseClient should raise ValueError in __init__
-    # because _get_access_token returns None on failure
-    with pytest.raises(ValueError) as exc_info:
-        _ = BaseClient(mock_config)
+    # 2) Now patch requests.post to return a token-less JSON response
+    with patch("requests.post") as mock_post:
+        mock_response: MagicMock = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"not_access_token": "some_value"}
+        mock_post.return_value = mock_response
 
-    assert "Failed to obtain access token" in str(exc_info.value)
+        with pytest.raises(ValueError, match="Failed to obtain access token"):
+            client._get_access_token()
+
+    assert "No access token in response" in caplog.text
 
 
-## Test make_graph_request
-@patch("requests.request")
-def test_make_graph_request_success(
-    mock_request: MagicMock, base_client: BaseClient
+def test_get_access_token_http_error(
+    mock_config: SharePointConfig, caplog: Any
 ) -> None:
     """
-    Test that make_graph_request returns a dictionary on success.
+    Test that _get_access_token raises a ValueError if an HTTPError occurs.
     """
-    # Mock a successful JSON response
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {"key": "value"}
-    mock_request.return_value = mock_response
+    caplog.set_level(logging.DEBUG, logger="sharepycrud")
 
-    url = "https://graph.microsoft.com/v1.0/some/endpoint"
-    response: Dict[str, Any] = base_client.make_graph_request(
-        url, method="POST", data={"param": "test"}
-    )
-    assert response == {"key": "value"}
+    # 1) Patch _get_access_token for __init__ so it won't fail
+    with patch.object(
+        BaseClient, "_get_access_token", return_value="constructor_mock_token"
+    ):
+        client: BaseClient = BaseClient(mock_config)
 
-    # Ensure the correct request call was made
-    mock_request.assert_called_once_with(
-        "POST",
-        url,
-        headers={
-            "Authorization": "Bearer mock_access_token",
-            "Accept": "application/json",
-        },
-        json={"param": "test"},
-    )
+    # Mock an HTTPError
+    with patch("requests.post") as mock_post:
+        mock_response: MagicMock = MagicMock()
+        http_error: requests.exceptions.HTTPError = requests.exceptions.HTTPError(
+            "Mock HTTP error"
+        )
+        http_error.response = MagicMock()
+        http_error.response.status_code = 400
+        http_error.response.reason = "Bad Request"
+        http_error.response.text = "Error details"
+        mock_response.raise_for_status.side_effect = http_error
+        mock_post.return_value = mock_response
+
+        with pytest.raises(ValueError, match="Failed to obtain access token"):
+            client._get_access_token()
+
+    assert "HTTP error getting access token: 400 - Bad Request" in caplog.text
+    assert "Response content: Error details" in caplog.text
 
 
-@patch("requests.request")
-def test_make_graph_request_raises_for_4xx(
-    mock_request: MagicMock, base_client: BaseClient
+def test_get_access_token_request_exception(
+    mock_config: SharePointConfig, caplog: Any
 ) -> None:
     """
-    Test that make_graph_request raises for HTTP error status.
+    Test that _get_access_token raises a ValueError if a generic requests.exceptions.RequestException occurs.
     """
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-        "400 Client Error"
-    )
-    mock_request.return_value = mock_response
+    # 1) Patch _get_access_token for __init__ so it won't fail
+    with patch.object(
+        BaseClient, "_get_access_token", return_value="constructor_mock_token"
+    ):
+        client: BaseClient = BaseClient(mock_config)
 
-    url = "https://graph.microsoft.com/v1.0/some/endpoint"
+    # 2) Simulate a generic RequestException (e.g., network failure)
+    with patch("requests.post") as mock_post:
+        mock_post.side_effect = requests.exceptions.RequestException("Network failure")
 
-    with pytest.raises(requests.exceptions.HTTPError) as exc_info:
-        base_client.make_graph_request(url)
+        with pytest.raises(ValueError, match="Failed to obtain access token"):
+            client._get_access_token()
 
-    assert "400 Client Error" in str(exc_info.value)
+    assert "Failed to get access token: Network failure" in caplog.text
 
 
-@patch("requests.request")
-def test_make_graph_request_invalid_json(
-    mock_request: MagicMock, base_client: BaseClient
+def test_make_graph_request_success(base_client: BaseClient) -> None:
+    """Test that make_graph_request returns the correct response."""
+    with patch("requests.request") as mock_request:
+        mock_request.return_value = MagicMock(
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+            json=lambda: {"key": "value"},
+        )
+        response: Dict[str, Any] = base_client.make_graph_request(
+            "https://mock-url.com"
+        )
+        assert response == {"key": "value"}
+
+
+def test_make_graph_request_error(base_client: BaseClient) -> None:
+    """Test that make_graph_request handles HTTP errors."""
+    with patch("requests.request") as mock_request:
+        mock_response: MagicMock = MagicMock()
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            "Mock HTTP error"
+        )
+        mock_response.status_code = 500
+        mock_response.text = "Error occurred"
+        mock_response.reason = "Internal Server Error"
+        mock_response.headers = {"Content-Type": "application/json"}
+
+        mock_request.return_value = mock_response
+
+        with pytest.raises(requests.exceptions.HTTPError, match="Mock HTTP error"):
+            base_client.make_graph_request("https://mock-url.com")
+
+
+def test_make_graph_request_no_access_token(
+    mock_config: SharePointConfig, caplog: Any
 ) -> None:
     """
-    Test that make_graph_request raises ValueError if JSON parsing fails.
+    Test that make_graph_request raises ValueError if the access token is missing/invalid.
+    We bypass the constructor check by returning a mock token, then set access_token = None.
     """
-    # Mock a response that raises ValueError when json() is called
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.side_effect = ValueError("Invalid JSON")
-    mock_request.return_value = mock_response
+    caplog.set_level(logging.DEBUG, logger="sharepycrud")
 
-    url = "https://graph.microsoft.com/v1.0/bad/json"
-    # Expect the method to raise ValueError if JSON is invalid
-    with pytest.raises(ValueError) as exc_info:
-        _ = base_client.make_graph_request(url)
+    # 1) Patch _get_access_token for __init__ so it won't fail
+    with patch.object(
+        BaseClient, "_get_access_token", return_value="constructor_mock_token"
+    ):
+        client_no_token = BaseClient(mock_config)
 
-    assert "Invalid JSON" in str(exc_info.value)
-
-
-@patch.object(BaseClient, "_get_access_token", return_value="mock_access_token")
-def test_make_graph_request_missing_token(
-    mock_get_access_token: MagicMock, mock_config: SharePointConfig
-) -> None:
-    """
-    Test that make_graph_request raises ValueError when the access token is missing.
-    """
-    # Create the BaseClient with a mocked access token
-    base_client = BaseClient(mock_config)
-    base_client.access_token = None  # Simulate missing access token
-
-    url = "https://graph.microsoft.com/v1.0/some/endpoint"
+    # 2) Now manually remove the token to simulate "no access token"
+    client_no_token.access_token = None
     with pytest.raises(ValueError, match="Access token is missing or invalid"):
-        base_client.make_graph_request(url)
+        client_no_token.make_graph_request("https://example.com")
+
+    assert "Access token is missing or invalid" in caplog.text
 
 
-@patch("requests.post")
-def test_make_graph_request_token_request(
-    mock_post: MagicMock, base_client: BaseClient
+def test_make_graph_request_with_custom_headers(base_client: BaseClient) -> None:
+    """
+    Test that make_graph_request correctly merges custom headers with default headers.
+    """
+    with patch("requests.request") as mock_request:
+        mock_response: MagicMock = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.headers = {"Content-Type": "application/json"}
+        mock_response.json.return_value = {"result": "ok"}
+        mock_request.return_value = mock_response
+
+        custom_headers: Dict[str, str] = {"X-Custom-Header": "12345"}
+        response: Dict[str, Any] = base_client.make_graph_request(
+            url="https://example.com/api",
+            method="POST",
+            headers=custom_headers,
+        )
+
+        # Verify the response
+        assert response == {"result": "ok"}
+
+        # Check the method, headers, and URL in the mock call
+        call_args: tuple[str, str] = mock_request.call_args.args  # Positional arguments
+        call_kwargs: Dict[str, Any] = mock_request.call_args.kwargs  # Keyword arguments
+
+        # Check HTTP method (first positional argument)
+        assert call_args[0] == "POST"
+        # Check URL (second positional argument)
+        assert call_args[1] == "https://example.com/api"
+        # Check headers (in kwargs)
+        sent_headers: Dict[str, str] = call_kwargs["headers"]
+        assert sent_headers["Authorization"] == "Bearer mock_access_token"
+        assert sent_headers["X-Custom-Header"] == "12345"
+
+
+def test_make_graph_request_returns_empty_dict_for_non_json(
+    base_client: BaseClient,
 ) -> None:
     """
-    Test that make_graph_request sets Content-Type for token requests.
+    Test that make_graph_request returns an empty dict for a non-JSON response.
     """
-    # Mock a successful response
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {"access_token": "new_token"}
-    mock_post.return_value = mock_response
+    with patch("requests.request") as mock_request:
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.headers = {"Content-Type": "text/plain"}  # Not JSON
+        mock_request.return_value = mock_response
 
-    url = "https://login.microsoftonline.com/test-tenant/oauth2/v2.0/token"
-    data = {"grant_type": "client_credentials"}
-    response = base_client.make_graph_request(url, method="POST", data=data)
-
-    assert response == {"access_token": "new_token"}
-    mock_post.assert_called_once_with(
-        url,
-        headers={
-            "Authorization": "Bearer mock_access_token",
-            "Accept": "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        data=data,
-    )
+        result: Dict[str, Any] = base_client.make_graph_request(
+            "https://example.com/api"
+        )
+        assert result == {}, "Expected an empty dict for non-JSON response"
 
 
-@patch("requests.request")
-def test_make_graph_request_post_method(
-    mock_request: MagicMock, base_client: BaseClient
+def test_make_graph_request_http_error_with_response(
+    base_client: BaseClient, caplog: Any
 ) -> None:
     """
-    Test make_graph_request handles POST requests correctly.
+    Test that make_graph_request handles HTTP errors and logs the error details.
     """
-    # Mock a successful response
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = None
-    mock_response.json.return_value = {"key": "value"}
-    mock_request.return_value = mock_response
+    caplog.set_level(logging.DEBUG, logger="sharepycrud")
 
-    url = "https://graph.microsoft.com/v1.0/some/endpoint"
-    data = {"param": "test"}
-    response = base_client.make_graph_request(url, method="POST", data=data)
+    with patch("requests.request") as mock_request:
+        mock_response = MagicMock()
+        http_error = requests.exceptions.HTTPError("Mock HTTP error")
+        http_error.response = MagicMock()
+        http_error.response.status_code = 500
+        http_error.response.reason = "Server Error"
+        http_error.response.text = "Internal Server Error"
 
-    assert response == {"key": "value"}
-    mock_request.assert_called_once_with(
-        "POST",
-        url,
-        headers={
-            "Authorization": "Bearer mock_access_token",
-            "Accept": "application/json",
-        },
-        json=data,
-    )
+        mock_response.raise_for_status.side_effect = http_error
+        mock_request.return_value = mock_response
+
+        with pytest.raises(requests.exceptions.HTTPError, match="Mock HTTP error"):
+            base_client.make_graph_request("https://example.com/api")
+
+    assert "HTTP error in request: 500 - Server Error" in caplog.text
+    assert "Response content: Internal Server Error" in caplog.text
+    assert "Failed URL: https://example.com/api" in caplog.text
+
+
+def test_make_graph_request_request_exception(
+    base_client: BaseClient, caplog: Any
+) -> None:
+    """
+    Test that make_graph_request raises a requests.exceptions.RequestException if a generic requests exception occurs.
+    """
+    caplog.set_level(logging.DEBUG, logger="sharepycrud")
+
+    with patch(
+        "requests.request",
+        side_effect=requests.exceptions.RequestException("Network Error"),
+    ):
+        with pytest.raises(requests.exceptions.RequestException, match="Network Error"):
+            base_client.make_graph_request("https://example.com/api")
+
+    assert "Request failed: Network Error" in caplog.text
+    assert "Failed URL: https://example.com/api" in caplog.text
 
 
 def test_format_graph_url(base_client: BaseClient) -> None:
+    """Test that format_graph_url correctly formats URLs."""
+    url: str = base_client.format_graph_url("sites", "site-id", "lists")
+    assert url == "https://graph.microsoft.com/v1.0/sites/site-id/lists"
+
+
+def test_format_graph_url_no_args(base_client: BaseClient, caplog: Any) -> None:
     """
-    Test format_graph_url with varying arguments.
+    Test that format_graph_url correctly formats URLs with no additional arguments.
     """
-    assert (
-        base_client.format_graph_url("drives")
-        == "https://graph.microsoft.com/v1.0/drives"
-    )
-    assert (
-        base_client.format_graph_url("drives", "12345", "items")
-        == "https://graph.microsoft.com/v1.0/drives/12345/items"
-    )
+    caplog.set_level(logging.DEBUG)
+
+    base_path = "sites"
+    url: str = base_client.format_graph_url(base_path)
+    assert url == "https://graph.microsoft.com/v1.0/sites"
+    assert f"Formatted Graph API URL: {url}" in caplog.text
+
+
+def test_format_graph_url_exception(base_client: BaseClient, caplog: Any) -> None:
+    """
+    Test that format_graph_url raises an exception if there's an error formatting the URL.
+    """
+    caplog.set_level(logging.DEBUG)
+
+    with patch(
+        "sharepycrud.baseClient.quote", side_effect=Exception("Mock Encoding Error")
+    ):
+        base_path = "sites"
+        args = ("invalid_path",)  # Note: args is a tuple when passed with *args
+
+        with pytest.raises(Exception, match="Mock Encoding Error"):
+            base_client.format_graph_url(base_path, *args)
+
+    assert "Error formatting Graph API URL: Mock Encoding Error" in caplog.text
+    assert f"base_path: {base_path}, args: {args}" in caplog.text
 
 
 def test_parse_folder_path(base_client: BaseClient) -> None:
+    """Test that parse_folder_path correctly parses folder paths."""
+    result: list[str] = base_client.parse_folder_path("/Folder1/Folder2/Folder3/")
+    assert result == ["Folder1", "Folder2", "Folder3"]
+
+
+def test_parse_folder_path_valid(base_client: BaseClient, caplog: Any) -> None:
     """
-    Test parse_folder_path with different folder path patterns.
+    Test parse_folder_path for a valid folder path to ensure parsing works.
     """
-    assert base_client.parse_folder_path("Folder1/FolderNest1/FolderNest2") == [
-        "Folder1",
-        "FolderNest1",
-        "FolderNest2",
-    ]
-    assert base_client.parse_folder_path("/Folder1/FolderNest1/") == [
-        "Folder1",
-        "FolderNest1",
-    ]
-    assert base_client.parse_folder_path("") == [""]
+    caplog.set_level(logging.DEBUG)
+
+    folder_path = "/Folder1/FolderNest1/FolderNest2/"
+    components: list[str] = base_client.parse_folder_path(folder_path)
+    assert components == ["Folder1", "FolderNest1", "FolderNest2"]
+    assert f"Parsed folder path '{folder_path}' into: {components}" in caplog.text
+
+
+def test_parse_folder_path_empty_input(base_client: BaseClient) -> None:
+    """Test parse_folder_path with empty input."""
+    result = base_client.parse_folder_path("")
+    assert result == [""]
+
+
+def test_parse_folder_path_exception(base_client: BaseClient, caplog: Any) -> None:
+    """
+    Test that parse_folder_path raises an exception if the input is None.
+    """
+    caplog.set_level(logging.DEBUG)
+
+    folder_path: Optional[str] = None
+
+    with pytest.raises(
+        AttributeError, match="'NoneType' object has no attribute 'strip'"
+    ):
+        base_client.parse_folder_path(cast(str, folder_path))
+
+    assert (
+        "Error parsing folder path: 'NoneType' object has no attribute 'strip'"
+        in caplog.text
+    )
+    assert f"Input folder_path: {folder_path}" in caplog.text
