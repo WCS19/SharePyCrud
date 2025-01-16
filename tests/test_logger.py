@@ -41,10 +41,9 @@ def test_setup_logging_default(caplog: Any) -> None:
     for handler in get_logger().handlers[:]:
         get_logger().removeHandler(handler)
 
-    setup_logging()  # Default level=INFO
+    setup_logging()
 
     test_logger: logging.Logger = get_logger()
-    # Should have exactly 1 handler (console handler)
     assert len(test_logger.handlers) == 1, "Expected exactly one console handler"
 
     test_logger.debug("Debug message - should not appear in caplog since level=INFO")
@@ -113,6 +112,29 @@ def test_setup_logging_stream_handler(caplog_debug_level: None) -> None:
 
     stream.seek(0)
     assert "Error message for both handlers" in stream.read()
+
+
+def test_setup_logging_removes_existing_handlers(caplog: Any) -> None:
+    """Test that setup_logging removes existing handlers before adding new ones."""
+    test_logger = get_logger()
+
+    # Clear existing handlers
+    for handler in test_logger.handlers[:]:
+        test_logger.removeHandler(handler)
+
+    # Add multiple handlers
+    stream_handler1 = logging.StreamHandler()
+    stream_handler2 = logging.StreamHandler()
+    test_logger.addHandler(stream_handler1)
+    test_logger.addHandler(stream_handler2)
+
+    assert len(test_logger.handlers) == 2, "Expected two handlers before setup"
+
+    setup_logging()  # Call setup_logging to remove existing handlers
+
+    assert len(test_logger.handlers) == 1, "Expected exactly one handler after setup"
+    assert stream_handler1 not in test_logger.handlers, "Old handler should be removed"
+    assert stream_handler2 not in test_logger.handlers, "Old handler should be removed"
 
 
 def test_log_formatter_no_color(caplog_debug_level: None) -> None:
