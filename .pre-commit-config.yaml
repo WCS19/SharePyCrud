@@ -30,3 +30,15 @@ repos:
         - mypy==1.11.2
         - pytest==8.3.2
         - types-requests==2.31.0.0
+
+-   repo: local
+    hooks:
+    -   id: update-version-and-verify
+        name: Update version badges and verify changelog
+        entry: python update_version_badge.py
+        language: system
+        always_run: true
+        files: ^(README\.md|docs/index\.md|docs/CHANGELOG\.md|pyproject\.toml)$
+        description: |
+            Ensures that version badges in Markdown files are updated and
+            the version exists in CHANGELOG.md. Fails if not consistent.
