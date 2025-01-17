@@ -1,9 +1,9 @@
 from typing import Optional, Dict, Any, List
 import requests
 from sharepycrud.baseClient import BaseClient
-import logging
+from sharepycrud.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("sharepycrud.createClient")
 
 
 class CreateClient:

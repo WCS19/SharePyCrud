@@ -1,10 +1,10 @@
 from typing import Dict, Any, Optional, cast, List, Union
 import requests
 from urllib.parse import quote
-from .config import SharePointConfig
-from .logger import get_logger
+from sharepycrud.config import SharePointConfig
+from sharepycrud.logger import get_logger
 
-logger = get_logger()
+logger = get_logger("sharepycrud.baseClient")
 
 
 class BaseClient:

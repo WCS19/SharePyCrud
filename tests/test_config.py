@@ -3,7 +3,9 @@ from unittest.mock import patch, MagicMock
 from typing import Any, List, Tuple
 import os
 from sharepycrud.config import SharePointConfig
-from sharepycrud.logger import logger
+from sharepycrud.logger import get_logger
+
+logger = get_logger("sharepycrud.config")
 
 
 @pytest.fixture
@@ -23,7 +25,7 @@ def test_validate_success(valid_config: SharePointConfig, caplog: Any) -> None:
     """
     Test that validate returns True when all fields are provided.
     """
-    caplog.set_level("DEBUG")
+    caplog.set_level("DEBUG", logger="sharepycrud.config")
     is_valid, missing_fields = valid_config.validate()
     assert is_valid, "Expected validation to succeed."
     assert missing_fields == [], "Expected no missing fields."
@@ -34,7 +36,7 @@ def test_validate_missing_fields(caplog: Any) -> None:
     """
     Test that validate raises ValueError and logs missing fields when some fields are missing.
     """
-    caplog.set_level("DEBUG")
+    caplog.set_level("DEBUG", logger="sharepycrud.config")
 
     config = SharePointConfig(
         tenant_id="",
@@ -90,7 +92,7 @@ def test_validate_logging_for_missing_fields(caplog: Any) -> None:
     """
     Test that validate logs missing fields at DEBUG level when validation fails.
     """
-    caplog.set_level("DEBUG")
+    caplog.set_level("DEBUG", logger="sharepycrud.config")
 
     config = SharePointConfig(
         tenant_id="",

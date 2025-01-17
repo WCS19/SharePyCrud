@@ -5,7 +5,7 @@ from sharepycrud.logger import setup_logging
 
 def main() -> None:
     """Example: Get drive ID by its name"""
-    setup_logging(level="INFO", log_file="get_drive_id.log")
+    setup_logging(level="INFO", log_file="get_drive_id.log", use_colors=False)
     config = SharePointConfig.from_env()
 
     client = ClientFactory.create_read_client(config)

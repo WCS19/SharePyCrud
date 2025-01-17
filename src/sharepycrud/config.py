@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from typing import Optional, Tuple, List
 import os
 from dotenv import load_dotenv
-from sharepycrud.logger import logger
+from sharepycrud.logger import get_logger
+
+logger = get_logger("sharepycrud.config")
 
 
 @dataclass
