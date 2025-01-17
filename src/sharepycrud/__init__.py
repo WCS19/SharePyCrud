@@ -7,7 +7,15 @@
 
 """SharePyCrud: A Python library for SharePoint CRUD operations."""
 
-__version__ = "0.2.1.dev3"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version(
+        "sharepycrud"
+    )  # dynamically fetch version from pyproject.toml
+except PackageNotFoundError:
+    __version__ = "0.0.0"
+
 
 from .config import SharePointConfig
 from .clientFactory import ClientFactory
