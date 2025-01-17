@@ -1,11 +1,15 @@
-black==24.8.0
-build==1.2.2.post1
-mypy==1.11.2
-pydantic==2.8.2
-pytest==8.3.2
-pytest-mock==3.14.0
-pytest-cov==6.0.0
-setuptools==75.6.0
-types-requests==2.32.0.20241016
-types-setuptools==75.6.0.20241223
-twine==6.0.1
+# DEPRECATED: Configuration moved to pyproject.toml
+# This file is kept temporarily for reference and will be removed in a future update.
+
+
+# black==24.8.0
+# build==1.2.2.post1
+# mypy==1.11.2
+# pydantic==2.8.2
+# pytest==8.3.2
+# pytest-mock==3.14.0
+# pytest-cov==6.0.0
+# setuptools==75.6.0
+# types-requests==2.32.0.20241016
+# types-setuptools==75.6.0.20241223
+# twine==6.0.1

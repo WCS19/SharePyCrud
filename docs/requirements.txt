@@ -1,4 +1,8 @@
-# Docs requirements
-mkdocs==1.6.1
-pytest-cov==6.0.0
-mkdocs-material==9.5.49
+# DEPRECATED: Configuration moved to pyproject.toml
+# This file is kept temporarily for reference and will be removed in a future update.
+
+
+# # Docs requirements
+# mkdocs==1.6.1
+# pytest-cov==6.0.0
+# mkdocs-material==9.5.49

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sharepycrud"
-version = "0.2.1.dev3"
+version = "0.2.1.dev4"
 description = "Python library for CRUD operations on SharePoint"
 readme = "README.md"
 authors = [
@@ -25,35 +25,85 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "build==1.2.2",
     "black>=24.8.0",
     "mypy==1.11.2",
     "pydantic==2.8.2",
+    "pre-commit==4.0.1",
+    "python-dotenv==1.0.1",
     "types-requests==2.31.0",
     "types-setuptools==75.6.0.20241223",
-    "pre-commit==4.0.1"
+    "twine==6.0.1",
 ]
 test = [
     "pytest==8.3.2",
     "pytest-mock==3.14.0",
+    "pytest-cov==6.0.0",
+    "pytest-html==4.1.1",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
 ]
 all = [
     "black>=24.8.0",
+    "build>=1.2.2",
     "mypy==1.11.2",
     "pydantic==2.8.2",
     "pytest==8.3.2",
     "pytest-mock==3.14.0",
+    "pytest-cov==6.0.0",
     "types-requests==2.31.0",
     "types-setuptools==75.6.0.20241223",
 ]
 
 [tool.setuptools]
-packages = ["sharepycrud"]
 package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sharepycrud*"]
 
 [tool.black]
 line-length = 88
 target-version = ["py312"]
 include = '\.pyi?$'
 
-[tool.pyright]
-extraPaths = ["./src"]
+[tool.mypy]
+python_version = "3.12"
+strict = true
+exclude = ["playground.py"]
+ignore_missing_imports = true
+check_untyped_defs = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_unused_ignores = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = "playground"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "update_version_badge"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "--cov=sharepycrud --cov-report=term-missing:skip-covered"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src/sharepycrud"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
