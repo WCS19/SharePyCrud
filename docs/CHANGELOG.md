@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1.dev4] - 2025-01-17
+### Changed
+- Centralized the build configuration to use only pyproject.toml.
+- Changed the versioning in src/sharepycrud/__init__.py to dynamically fetch the version from pyproject.toml.
+- Updated GitHub Actions workflow to use pip caching for faster builds
+- Updated ReadTheDocs configuration to use pyproject.toml extras
+- Improved test coverage reporting configuration
+
+### Deprecated
+- Deprecated setup.py, requirements.txt, dev-requirements.txt, and docs/requirements.txt.
+- Deprecated mypy.ini in favor of pyproject.toml configuration
+- Moved configuration to pyproject.toml to support a more modern build system.
+
+### Added
+- Added explicit package discovery configuration in pyproject.toml
+- Added test configuration in pyproject.toml
+- Added coverage reporting configuration in pyproject.toml
+
+### Fixed
+- Fixed duplicate dependency declarations between main and optional dependencies
+- Fixed test coverage reporting paths for accurate coverage metrics
+
 ## [0.2.1.dev3] - 2025-01-17
 ### Added
 - Added logging configuration support for the logging system
