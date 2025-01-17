@@ -1,5 +1,5 @@
 # SharePyCrud Package
-[![Version](https://img.shields.io/badge/version-0.2.1.dev2-blue)](#)
+[![Version](https://img.shields.io/badge/version-0.2.1.dev3-blue)](#)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 ![Tests Status](https://github.com/WCS19/SharePyCrud/actions/workflows/python-app.yml/badge.svg)
 [![codecov](https://codecov.io/gh/WCS19/SharePyCrud/branch/main/graph/badge.svg)](https://codecov.io/gh/WCS19/SharePyCrud)
@@ -14,12 +14,13 @@ This package is a Python library for SharePoint CRUD operations. The package is 
 
 1. [Introduction](#introduction)
 2. [Setup Instructions](#setup-instructions)
-3. [Contributing](#contributing)
-4. [Documentation References](#documentation-references)
-5. [Examples](#examples)
-6. [Changelog](#changelog)
-7. [Github Repository](https://github.com/WCS19/SharePyCrud)
-8. [License](#license)
+3. [Architecture](#architecture)
+4. [Logging](#logging-system)
+5. [Contributing](#contributing)
+6. [Documentation References](#documentation-references)
+7. [Changelog](#changelog)
+8. [ReadTheDocs Documentation](#readthedocs-documentation)
+9. [License](#license)
 
 
 ---
@@ -40,6 +41,20 @@ SharePyCrud simplifies interaction with SharePoint for CRUD (Create, Read, Updat
 ## Setup Instructions
 
 To use this package, follow the setup instructions provided in the [SETUP.md](setup.md) file. It includes step-by-step instructions to configure the package and set up your development environment.
+
+---
+
+## Logging System
+
+SharePyCrud implements an environment-aware logging system that automatically adapts to different execution contexts. Key features include:
+
+- Color-coded logs in terminal environments
+- Automatic format adjustment for different outputs
+- Module-specific logging support
+- File and console output options
+
+For detailed information about logging configuration and usage, see [LOGGING.md](docs/LOGGING.md).
+
 
 ---
 

@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1.dev3] - 2025-01-17
+### Added
+- Added logging configuration support for the logging system
+- Added LogConfig class for centralized color and formatting configuration
+- Added environment-aware color support for terminal vs non-terminal environments
+- Added automatic TTY detection for proper color handling
+- Added file output formatting without ANSI color codes
+
+### Changed
+- Updated client classes to use dynamic logging configuration based on the module name
+- Moved color configuration from LogFormatter to LogConfig class
+- Separated console and file formatter logic for better maintainability
+- Improved logging setup to handle both string and numeric log levels
+
+### Fixed
+- Fixed color bleeding in log files by properly handling non-terminal outputs
+- Fixed handler cleanup to prevent duplicate log entries
+- Fixed module name handling in get_logger for consistent logger hierarchy
+
 ## [0.2.1.dev2] - 2025-01-16
 
 ### Fixed

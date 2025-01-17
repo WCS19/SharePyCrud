@@ -13,31 +13,66 @@ The `logger.py` module centralizes the logging configuration for the entire pack
 ## **Logger Configuration**
 
 ### **Key Features**
+- **Environment-Aware Logging:**
+  The logging system automatically adapts to different environments (terminal vs non-terminal, file vs console) and adjusts formatting accordingly.
+
 - **Custom Log Formatting:**
-  The `LogFormatter` class formats log messages, adding optional color coding for different log levels when outputting to the terminal. This makes it easier to distinguish between log levels (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
+  The `LogConfig` class provides centralized configuration for log formatting, including:
+  - Color-coded output for terminal environments
+  - Plain text for file outputs and non-terminal environments
+  - Consistent formatting across all logging methods
 
 - **Log Levels:**
-  Logging levels can be configured (e.g., `DEBUG`, `INFO`, `ERROR`), allowing developers to control the verbosity of logs.
+  [Previous content remains]
 
 - **Output Options:**
-  Logs can be directed to the console, a file, or both, based on the configuration.
+  [Previous content remains]
 
 - **Reusable Logger:**
-  A shared logger instance is available throughout the package using `get_logger()`.
+  [Previous content remains]
 
 ### **Setup**
-The `setup_logging()` function allows flexible configuration of logging parameters:
+The `setup_logging()` function provides environment-aware configuration:
 - `level`: The minimum logging level (default is `INFO`).
-- `log_file`: An optional file to which logs can be written.
-- `log_format`: A customizable format string for log messages.
+- `log_file`: An optional file to which logs can be written. (default is `None`)
+- `use_colors`: Enable/disable color output (automatically disabled for non-terminal environments). (default is `True`)
 
 Example:
+
 ```python
 from sharepycrud.logger import setup_logging
 
+# Basic setup with color support (if in terminal)
+setup_logging(level="INFO")
+
+# Setp with file output and no color support
 setup_logging(
     level="DEBUG",
     log_file="application.log",
-    log_format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    use_colors=False,
 )
 ```
+
+### **Using Logger in Modules**
+
+```python
+from sharepycrud.logger import get_logger
+
+logger = get_logger(__name__)
+
+# Example usage
+logger.info("This is an info message")
+logger.error("This is an error message")
+```
+
+### **Color Support**
+
+
+### **Color Support**
+The logging system automatically handles color support:
+- Colors are enabled by default in terminal environments
+- Colors are automatically disabled for:
+  - File outputs
+  - Non-terminal environments
+  - When explicitly disabled via `use_colors=False`
+  - **Note**: if `use_colors=True` is set, the color support is enabled regardless of the environment and will write to log file using the color codes.
