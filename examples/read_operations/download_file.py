@@ -7,7 +7,7 @@ from sharepycrud.clientFactory import ClientFactory
 
 def main() -> None:
     """Example: Download a file from SharePoint"""
-    setup_logging(level="INFO", log_file="download_file.log")
+    setup_logging(level="INFO", log_file="download_file.log", use_colors=False)
 
     config = SharePointConfig.from_env()
     read_client = ClientFactory.create_read_client(config)

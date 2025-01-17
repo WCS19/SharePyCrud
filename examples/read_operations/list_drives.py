@@ -5,7 +5,7 @@ from sharepycrud.logger import setup_logging
 
 def main() -> None:
     """Example: List drives and root contents in SharePoint site"""
-    setup_logging(level="INFO", log_file="list_drives.log")
+    setup_logging(level="INFO", log_file="list_drives.log", use_colors=False)
 
     config = SharePointConfig.from_env()
     read_client = ClientFactory.create_read_client(config)
