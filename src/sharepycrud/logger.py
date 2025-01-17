@@ -1,91 +1,55 @@
 import sys
 import logging
 from typing import Optional, Union, TextIO, Dict, ClassVar, Any
-
-logger: logging.Logger = logging.getLogger("sharepycrud")
-
-
-class LogFormatter(logging.Formatter):
-    """Custom formatter with colors for different log levels"""
-
-    COLORS: ClassVar[Dict[str, str]] = {
-        "DEBUG": "\033[0;36m",  # Cyan
-        "INFO": "\033[0;32m",  # Green
-        "WARNING": "\033[0;33m",  # Yellow
-        "ERROR": "\033[0;31m",  # Red
-        "CRITICAL": "\033[0;37;41m",  # White on Red
-        "RESET": "\033[0m",  # Reset
-    }
-
-    def format(self, record: logging.LogRecord) -> str:
-        """
-        Format the log record with optional color coding.
-
-        Args:
-            record: The log record to format
-
-        Returns:
-            The formatted log string
-        """
-        # Add colors if log message is going to a terminal
-        if sys.stderr.isatty():
-            levelname: str = record.levelname
-            record.levelname = (
-                f"{self.COLORS.get(levelname, '')}"
-                f"{levelname}"
-                f"{self.COLORS['RESET']}"
-            )
-        return super().format(record)
+from sharepycrud.loggerConfig import LogConfig
 
 
 def setup_logging(
-    level: Union[int, str] = logging.INFO,
-    log_file: Optional[Union[str, TextIO]] = None,
-    log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level: Union[int, str] = "INFO",
+    log_file: Optional[str] = None,
+    use_colors: bool = True,
 ) -> None:
-    """
-    Configure package-wide logging settings.
+    """Configure package-wide logging settings with environment aware settings."""
 
-    Args:
-        level: Logging level (default: INFO)
-        log_file: Optional file path or file object to write logs to
-        log_format: Format string for log messages
+    root_logger = logging.getLogger("sharepycrud")
 
-    Returns:
-        None
-    """
-    # Convert string level to integer if necessary
-    numeric_level: int
+    # Handle level setting with proper type checking
     if isinstance(level, str):
         numeric_level = getattr(logging, level.upper())
     else:
         numeric_level = level
 
-    logger.setLevel(numeric_level)
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
+    root_logger.setLevel(numeric_level)
 
-    formatter: LogFormatter = LogFormatter(log_format)
+    # Clear existing handlers
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
 
-    console_handler: logging.StreamHandler[Any] = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # Add console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(
+        LogConfig.get_console_formatter(use_colors and sys.stdout.isatty())
+    )
+    root_logger.addHandler(console_handler)
 
-    if log_file is not None:
-        file_handler: Union[logging.FileHandler, logging.StreamHandler[Any]]
-        if isinstance(log_file, str):
-            file_handler = logging.FileHandler(log_file)
-        else:
-            file_handler = logging.StreamHandler(log_file)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+    if log_file:
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(LogConfig.get_file_formatter())
+        root_logger.addHandler(file_handler)
 
 
-def get_logger() -> logging.Logger:
+def get_logger(module_name: str = __name__) -> logging.Logger:
     """
-    Get the package logger.
+    Get a logger for a specific module.
+
+    Args:
+        module_name: The name of the module requesting the logger (default: __name__)
 
     Returns:
-        The configured package logger
+        A logger instance configured for the specified module
     """
-    return logger
+    if module_name.startswith("sharepycrud"):
+        logger_name = module_name
+    else:
+        logger_name = f"sharepycrud.{module_name}"
+    return logging.getLogger(logger_name)

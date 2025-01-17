@@ -4,9 +4,9 @@ from sharepycrud.baseClient import BaseClient
 from sharepycrud.readClient import ReadClient
 from sharepycrud.createClient import CreateClient
 from sharepycrud.config import SharePointConfig
-import logging
+from sharepycrud.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("sharepycrud.clientFactory")
 
 
 class ClientFactory:

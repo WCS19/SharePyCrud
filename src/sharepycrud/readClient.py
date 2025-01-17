@@ -3,9 +3,9 @@ from sharepycrud.config import SharePointConfig
 from typing import Optional, List, Dict, Any, Tuple
 import requests
 from requests import Response
-import logging
+from sharepycrud.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("sharepycrud.readClient")
 
 
 class ReadClient:
