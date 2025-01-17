@@ -56,9 +56,7 @@ jobs:
           --cov=src/sharepycrud \
           --cov-report=xml:coverage-results/coverage.xml \
           --cov-report=html:coverage-results/htmlcov \
-          --junitxml=test-results/junit.xml \
-          --html=test-results/report.html \
-          --self-contained-html
+          --junitxml=test-results/junit.xml
 
     - name: Upload coverage results
       if: always()
