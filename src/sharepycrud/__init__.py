@@ -7,7 +7,7 @@
 
 """SharePyCrud: A Python library for SharePoint CRUD operations."""
 
-__version__ = "0.2.1.dev2"
+__version__ = "0.2.1.dev3"
 
 from .config import SharePointConfig
 from .clientFactory import ClientFactory
@@ -15,6 +15,7 @@ from .baseClient import BaseClient
 from .createClient import CreateClient
 from .readClient import ReadClient
 from .logger import setup_logging, get_logger
+from .loggerConfig import LogConfig
 
 __all__ = [
     "SharePointConfig",
@@ -24,4 +25,5 @@ __all__ = [
     "ReadClient",
     "setup_logging",
     "get_logger",
+    "LogConfig",
 ]
