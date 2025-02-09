@@ -500,3 +500,83 @@ class ReadClient:
 
         logger.info(f"Failed to download: {file_path}")
         return None
+
+    def list_lists(self, site_id: str) -> List[Dict[str, Any]]:
+        """List all custom lists (excluding document libraries and system lists like Web Template Extensions) in a SharePoint site.
+
+        Args:
+            site_id (str): The ID of the SharePoint site
+
+        Returns:
+            List[Dict[str, Any]]: List of dictionaries containing list information, excluding document libraries
+        """
+
+        url = self.client.format_graph_url("sites", site_id, "lists")
+        response = self.client.make_graph_request(url)
+        items = response.get("value", [])
+
+        system_lists = {"Web Template Extensions"}
+
+        # Filter out document libraries
+        formatted_lists = []
+        list_names = []
+        for item in items:
+            template = item.get("list", {}).get("template", "")
+            display_name = item.get("displayName", "")
+            hidden = item.get("hidden", False)
+
+            # Skip if it's a document library or system list or hidden
+            if template == "documentLibrary" or display_name in system_lists or hidden:
+                continue
+
+            formatted_list = {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "displayName": item.get("displayName"),
+                "description": item.get("description"),
+                "webUrl": item.get("webUrl"),
+                "template": template,
+                "createdDateTime": item.get("createdDateTime"),
+                "lastModifiedDateTime": item.get("lastModifiedDateTime"),
+            }
+            list_names.append(item.get("name"))
+            formatted_lists.append(formatted_list)
+
+        logger.info(f"Found {len(formatted_lists)} custom lists in site {site_id}")
+        logger.info(f"Lists: {list_names}")
+        return formatted_lists
+
+    def get_list_id_by_name(self, site_id: str, list_name: str) -> Optional[str]:
+        """Get the ID of a SharePoint list by its name.
+
+        Args:
+            site_id (str): ID of the SharePoint site
+            list_name (str): Name or display name of the list to retrieve
+
+        Returns:
+            Optional[str]: The ID of the list, or None if the list is not found or the request fails
+        """
+        if not self.client.access_token:
+            logger.error("No access token available")
+            return None
+
+        url = self.client.format_graph_url("sites", site_id, "lists")
+        response = self.client.make_graph_request(url)
+
+        if not response or "value" not in response:
+            logger.error("Failed to get lists from SharePoint")
+            return None
+
+        for list_item in response["value"]:
+            # Check both name and displayName fields for a match
+            if (
+                list_item.get("name") == list_name
+                or list_item.get("displayName") == list_name
+            ):
+                list_id = list_item.get("id")
+                if isinstance(list_id, str):
+                    logger.info(f"Found list '{list_name}' with ID: {list_id}")
+                    return list_id
+
+        logger.info(f"List not found: {list_name}")
+        return None
