@@ -25,6 +25,13 @@ The library is structured with clear separation of concerns across three client 
    - Logs only business-level events
    - No direct HTTP or authentication handling
 
+4. DeleteClient
+   - Focuses solely on delete operations (DELETE requests)
+   - Implements business logic for deleting SharePoint resources
+   - Uses BaseClient for HTTP operations
+   - Logs only business-level events
+   - No direct HTTP or authentication handling
+
 ### Client Factory Pattern
 
 1. Centralized Client Management

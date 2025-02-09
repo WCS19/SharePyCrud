@@ -1,12 +1,12 @@
 # SharePyCrud Package
-[![Version](https://img.shields.io/badge/version-0.2.1.dev4-blue)](#)
+[![Version](https://img.shields.io/badge/version-0.2.1.dev5-blue)](#)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 ![Tests Status](https://github.com/WCS19/SharePyCrud/actions/workflows/python-app.yml/badge.svg)
 [![codecov](https://codecov.io/gh/WCS19/SharePyCrud/branch/main/graph/badge.svg)](https://codecov.io/gh/WCS19/SharePyCrud)
 
 
 
-This package is a Python library for SharePoint CRUD operations. The package is currently in development with only **read** and **write** operations implemented. Update and Delete operations are under development and will be added in future releases.
+This package is a Python library for SharePoint CRUD operations. The package is currently in development with only **read**, **write**, and **delete** operations implemented. Update operations are under development and will be added in future releases.
 
 ---
 

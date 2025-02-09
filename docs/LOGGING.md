@@ -6,7 +6,7 @@ The `sharepycrud` Python package implements a robust and configurable logging me
 
 The `logger.py` module centralizes the logging configuration for the entire package. It ensures that logs are consistent, informative, and easy to debug. The logging is divided into two primary responsibilities:
 1. **Core Errors and HTTP-Level Issues:** Handled by the `BaseClient`.
-2. **Business Logic-Specific Logging:** Managed in the `CreateClient` and `ReadClient` layers.
+2. **Business Logic-Specific Logging:** Managed in the `CreateClient`, `ReadClient`, and `DeleteClient` layers.
 
 ---
 

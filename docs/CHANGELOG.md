@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1.dev5] - 2025-01-17
+### Added
+- Added DeleteClient class for delete operations
+- Class methods still in development.
+
+- Added new get list id by name method to ReadClient.
+- Work in progress. Version .dev5 still under development
+
+
+
 ## [0.2.1.dev4] - 2025-01-17
 ### Changed
 - Centralized the build configuration to use only pyproject.toml.
