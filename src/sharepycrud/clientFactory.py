@@ -3,6 +3,7 @@ from typing import Optional
 from sharepycrud.baseClient import BaseClient
 from sharepycrud.readClient import ReadClient
 from sharepycrud.createClient import CreateClient
+from sharepycrud.deleteClient import DeleteClient
 from sharepycrud.config import SharePointConfig
 from sharepycrud.logger import get_logger
 
@@ -43,6 +44,14 @@ class ClientFactory:
         """
         base_client = cls.get_base_client(config)
         return CreateClient(base_client)
+
+    @classmethod
+    def create_delete_client(cls, config: SharePointConfig) -> DeleteClient:
+        """
+        Create a DeleteClient instance using the shared BaseClient.
+        """
+        base_client = cls.get_base_client(config)
+        return DeleteClient(base_client)
 
     @classmethod
     def reset_base_client(cls) -> None:
